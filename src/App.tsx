@@ -1,20 +1,33 @@
+import { Switch, Route, Router } from "wouter";
+import { ThemeProvider } from "@/contexts/theme-context";
+import { AppShell } from "@/components/layout/AppShell";
+import { Home } from "@/pages/Home";
+import { Workout } from "@/pages/Workout";
+import { History } from "@/pages/History";
+import { Goals } from "@/pages/Goals";
+import { Profile } from "@/pages/Profile";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 function App() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-canvas px-6 text-center">
-      <img
-        src={`${import.meta.env.BASE_URL}pleak-glyph.png`}
-        alt="Pleak"
-        className="h-20 w-auto"
-      />
-      <h1 className="display-lg text-ink">PLEAK</h1>
-      <p className="max-w-xs text-body text-base">
-        Your workouts, tracked simply.
-      </p>
-      <span className="rounded-pill bg-surface-card px-3 py-1 text-xs font-medium text-muted">
-        Brand shell &middot; Phase 1
-      </span>
-    </div>
-  )
+    <ThemeProvider>
+      <Router base={base}>
+        <AppShell>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/workout" component={Workout} />
+            <Route path="/history" component={History} />
+            <Route path="/goals" component={Goals} />
+            <Route path="/profile" component={Profile} />
+            <Route>
+              <p className="text-sm text-muted">Page not found.</p>
+            </Route>
+          </Switch>
+        </AppShell>
+      </Router>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;

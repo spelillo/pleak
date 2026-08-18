@@ -107,14 +107,43 @@ body {
   letter-spacing: -0.5px;
 }
 
+/* Dark mode: CSS-variable strategy (Section 8.A), toggled by a `.dark` /
+   `.light` class on <html> (see ThemeProvider). Primary flips from
+   black-on-white to white-on-black so the CTA keeps AA contrast against
+   the dark canvas rather than disappearing into it. */
+:root.dark {
+  --color-canvas: #101010;
+  --color-ink: #ffffff;
+  --color-body: #d1d5db;
+  --color-muted: #a1a1aa;
+  --color-muted-soft: #71717a;
+  --color-surface-card: #1a1a1a;
+  --color-surface-soft: #18181b;
+  --color-surface-strong: #27272a;
+  --color-hairline: #27272a;
+  --color-hairline-soft: #1f1f23;
+  --color-primary: #ffffff;
+  --color-primary-active: #e5e7eb;
+  --color-primary-disabled: #3f3f46;
+  --color-on-primary: #111111;
+}
+
+/* System fallback only when the user hasn't explicitly chosen a mode. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light):not(.dark) {
     --color-canvas: #101010;
     --color-ink: #ffffff;
     --color-body: #d1d5db;
     --color-muted: #a1a1aa;
+    --color-muted-soft: #71717a;
     --color-surface-card: #1a1a1a;
     --color-surface-soft: #18181b;
+    --color-surface-strong: #27272a;
     --color-hairline: #27272a;
+    --color-hairline-soft: #1f1f23;
+    --color-primary: #ffffff;
+    --color-primary-active: #e5e7eb;
+    --color-primary-disabled: #3f3f46;
+    --color-on-primary: #111111;
   }
 }
