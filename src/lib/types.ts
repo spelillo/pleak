@@ -1,5 +1,5 @@
 // Data shapes for the Pleak Apps Script API. Mirrors the sheet tabs defined
-// in apps-script/Code.gs. Field set is trimmed from the original LifeBud
+// in apps-script/Config.gs. Field set is trimmed from the original LifeBud
 // schema per the Phase 1 scope decisions (no billing, social, GPS, AI, or
 // password fields) — see docs/design-guidelines.md and the project plan.
 

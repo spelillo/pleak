@@ -11,11 +11,19 @@ these steps are for you to run. Takes about 5 minutes.
 
 ## 2. Add the script
 
+The API is split across five small files under [`apps-script/`](../apps-script/)
+— `Config.gs`, `Setup.gs`, `Router.gs`, `SheetHelpers.gs`, `CrudHelpers.gs` —
+each under 100 lines so it pastes cleanly. They all share one global scope,
+so it doesn't matter what order you add them in.
+
 1. In the Sheet, go to **Extensions → Apps Script**. This opens the Apps
    Script editor in a new tab, already linked to this Sheet.
-2. Delete the placeholder content in `Code.gs`.
-3. Paste in the full contents of [`apps-script/Code.gs`](../apps-script/Code.gs)
-   from this repo.
+2. Delete the placeholder content in the default `Code.gs` file, then either
+   rename it to `Config.gs` or delete it entirely — either way you'll end up
+   with five files matching the ones in the repo.
+3. For each of the five files in `apps-script/`: create a new script file in
+   the editor (the `+` next to "Files") named to match (e.g. `Config`), and
+   paste in that file's full contents.
 4. Click the save icon (or `Cmd+S`).
 
 ## 3. Run setup once
@@ -54,8 +62,8 @@ these steps are for you to run. Takes about 5 minutes.
 
 ## Redeploying after script changes
 
-Any time `apps-script/Code.gs` changes in this repo, you need to manually
-paste the new version into the Apps Script editor and create a **new
-deployment version** (Deploy → Manage deployments → edit (pencil) → New
-version → Deploy) — saving the file alone does not update the live `/exec`
-URL.
+Any time a file under `apps-script/` changes in this repo, you need to
+manually paste the new version into the matching file in the Apps Script
+editor and create a **new deployment version** (Deploy → Manage deployments
+→ edit (pencil) → New version → Deploy) — saving the file alone does not
+update the live `/exec` URL.
