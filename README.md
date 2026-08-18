@@ -6,8 +6,8 @@ A simple workout tracker for a small group of people, hosted on GitHub Pages wit
 
 - React + TypeScript + Vite
 - Tailwind CSS v4 (brand tokens in [`src/index.css`](src/index.css))
-- Google Apps Script Web App + Google Sheets (data layer, added in a later phase)
-- Google Sign-In (auth, added in a later phase)
+- Google Apps Script Web App + Google Sheets (data layer)
+- Google Sign-In (auth) — see [docs/google-signin-setup.md](docs/google-signin-setup.md)
 
 ## Development
 

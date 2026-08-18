@@ -11,6 +11,15 @@ function handleRequest_(e, method) {
     var params = (e && e.parameter) || {};
     var resourceName = params.resource;
     var action = params.action || (method === 'GET' ? 'list' : null);
+
+    if (resourceName === 'auth') {
+      if (method !== 'POST' || action !== 'login') {
+        return respondJson_({ error: 'Unsupported auth action' });
+      }
+      var authBody = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+      return respondJson_(handleAuthLogin_(authBody));
+    }
+
     var config = RESOURCES[resourceName];
 
     if (!config) {

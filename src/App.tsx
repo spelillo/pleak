@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
 import { Switch, Route, Router } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/contexts/theme-context";
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { SignInGate } from "@/components/auth/SignInGate";
 import { AppShell } from "@/components/layout/AppShell";
 import { Home } from "@/pages/Home";
 import { Workout } from "@/pages/Workout";
@@ -29,24 +32,34 @@ const queryClient = new QueryClient({
   },
 });
 
+function AuthGate({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <SignInGate />;
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <Router base={base}>
-          <AppShell>
-            <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/workout" component={Workout} />
-              <Route path="/history" component={History} />
-              <Route path="/goals" component={Goals} />
-              <Route path="/profile" component={Profile} />
-              <Route>
-                <p className="text-sm text-muted">Page not found.</p>
-              </Route>
-            </Switch>
-          </AppShell>
-        </Router>
+        <AuthProvider>
+          <AuthGate>
+            <Router base={base}>
+              <AppShell>
+                <Switch>
+                  <Route path="/" component={Home} />
+                  <Route path="/workout" component={Workout} />
+                  <Route path="/history" component={History} />
+                  <Route path="/goals" component={Goals} />
+                  <Route path="/profile" component={Profile} />
+                  <Route>
+                    <p className="text-sm text-muted">Page not found.</p>
+                  </Route>
+                </Switch>
+              </AppShell>
+            </Router>
+          </AuthGate>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

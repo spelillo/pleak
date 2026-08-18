@@ -11,20 +11,24 @@ these steps are for you to run. Takes about 5 minutes.
 
 ## 2. Add the script
 
-The API is split across five small files under [`apps-script/`](../apps-script/)
-— `Config.gs`, `Setup.gs`, `Router.gs`, `SheetHelpers.gs`, `CrudHelpers.gs` —
-each under 100 lines so it pastes cleanly. They all share one global scope,
-so it doesn't matter what order you add them in.
+The API is split across six small files under [`apps-script/`](../apps-script/)
+— `Config.gs`, `Setup.gs`, `Router.gs`, `SheetHelpers.gs`, `CrudHelpers.gs`,
+`Auth.gs` — each under 100 lines so it pastes cleanly. They all share one
+global scope, so it doesn't matter what order you add them in.
 
 1. In the Sheet, go to **Extensions → Apps Script**. This opens the Apps
    Script editor in a new tab, already linked to this Sheet.
 2. Delete the placeholder content in the default `Code.gs` file, then either
    rename it to `Config.gs` or delete it entirely — either way you'll end up
-   with five files matching the ones in the repo.
-3. For each of the five files in `apps-script/`: create a new script file in
+   with six files matching the ones in the repo.
+3. For each of the six files in `apps-script/`: create a new script file in
    the editor (the `+` next to "Files") named to match (e.g. `Config`), and
    paste in that file's full contents.
-4. Click the save icon (or `Cmd+S`).
+4. In `Config.gs`, set `GOOGLE_CLIENT_ID` and `ALLOWED_EMAILS` — see
+   [google-signin-setup.md](google-signin-setup.md) for where the client ID
+   comes from. Every Google account that should be able to sign in needs its
+   email listed in `ALLOWED_EMAILS`.
+5. Click the save icon (or `Cmd+S`).
 
 ## 3. Run setup once
 
@@ -47,9 +51,14 @@ so it doesn't matter what order you add them in.
 3. Set:
    - **Execute as:** Me (your account)
    - **Who has access:** Anyone
-   - (This is intentionally open for now — Phase 3 has no login yet. Phase 4
-     adds real access control so only your allowed Google accounts can
-     write data.)
+   - (This has to stay "Anyone" for an Apps Script Web App to be reachable
+     from the browser at all. Signing in with Google verifies who's using
+     the *app* — the frontend won't show any data until you've signed in
+     with an email in `ALLOWED_EMAILS` — but the `/exec` URL itself has no
+     per-request authorization yet: anyone who has the URL could call it
+     directly, bypassing the UI. Treat the URL as a shared secret for now,
+     the same as before this phase. See
+     [google-signin-setup.md](google-signin-setup.md).)
 4. Click **Deploy**, authorize again if prompted.
 5. Copy the **Web app URL** it gives you (ends in `/exec`).
 

@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Barbell, CalendarBlank } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -14,10 +15,12 @@ export function Home() {
           <p className="text-sm font-semibold text-ink">Start a workout</p>
           <p className="text-sm text-muted">Jump straight into logging sets.</p>
         </div>
-        <Button variant="primary">
-          <Barbell size={16} weight="bold" />
-          Start
-        </Button>
+        <Link href="/workout">
+          <Button variant="primary">
+            <Barbell size={16} weight="bold" />
+            Start
+          </Button>
+        </Link>
       </Card>
 
       <h2 className="mb-3 text-sm font-semibold text-ink">This week</h2>

@@ -1,9 +1,10 @@
-import { Sun, Moon, Desktop, SignIn } from "@phosphor-icons/react";
+import { Sun, Moon, Desktop, SignOut } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { useTheme } from "@/contexts/theme-context";
+import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/cn";
 
 const themeOptions = [
@@ -14,20 +15,21 @@ const themeOptions = [
 
 export function Profile() {
   const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
 
   return (
     <div>
       <PageHeader title="Profile" />
 
       <Card variant="outline" className="mb-6 flex items-center gap-4">
-        <Avatar name="Not signed in" size={48} />
+        <Avatar name={user?.displayName ?? "?"} size={48} />
         <div className="flex-1">
-          <p className="text-sm font-semibold text-ink">Not signed in</p>
-          <p className="text-sm text-muted">Sign in with Google to sync your data.</p>
+          <p className="text-sm font-semibold text-ink">{user?.displayName}</p>
+          <p className="text-sm text-muted">{user?.email}</p>
         </div>
-        <Button variant="secondary" size="sm" disabled>
-          <SignIn size={16} />
-          Sign in
+        <Button variant="secondary" size="sm" onClick={signOut}>
+          <SignOut size={16} />
+          Sign out
         </Button>
       </Card>
 

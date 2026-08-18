@@ -14,10 +14,21 @@
  *   POST ?resource=<name>&action=delete   body: JSON { id }
  *
  * This project is split across several small .gs files (Config, Router,
- * SheetHelpers, CrudHelpers) purely to keep each file short to paste —
- * Apps Script shares one global scope across all files in a project, so
- * this split changes nothing about how the code runs.
+ * SheetHelpers, CrudHelpers, Auth) purely to keep each file short to
+ * paste — Apps Script shares one global scope across all files in a
+ * project, so this split changes nothing about how the code runs.
  */
+
+// OAuth client ID from Google Cloud Console (Credentials → OAuth client ID
+// → Web application). Must match VITE_GOOGLE_CLIENT_ID in the frontend's
+// .env.local. See docs/google-signin-setup.md.
+var GOOGLE_CLIENT_ID = '899766933205-um8vmlar0c3jj443tqt9fhipt601gv1q.apps.googleusercontent.com';
+
+// Only these Google accounts may sign in. Add every email address in your
+// group here (case-insensitive).
+var ALLOWED_EMAILS = [
+  'spelillo11@gmail.com',
+];
 
 var RESOURCES = {
   users: {
