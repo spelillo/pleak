@@ -1,0 +1,24 @@
+{
+  "name": "Pleak",
+  "short_name": "Pleak",
+  "description": "A simple workout tracker.",
+  "start_url": "/pleak/",
+  "scope": "/pleak/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2774AE",
+  "icons": [
+    {
+      "src": "/pleak/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pleak/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
