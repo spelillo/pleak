@@ -532,7 +532,7 @@ export function ActiveWorkout({
               <X size={18} />
             </button>
           </div>
-          <ExercisePicker exercises={availableToAdd} onAdd={addExerciseToWorkout} />
+          <ExercisePicker exercises={availableToAdd} onSelect={addExerciseToWorkout} />
         </Modal>
       )}
     </div>

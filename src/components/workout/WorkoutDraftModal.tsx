@@ -2,48 +2,28 @@ import { useState } from "react";
 import { ArrowLeft, ArrowsClockwise, Barbell, PencilSimple, Plus, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { ExercisePicker } from "@/components/workout/ExercisePicker";
-import {
-  DEFAULT_REPS,
-  buildDefaultSets,
-  estimateDurationMinutes,
-  type WorkoutTypeOption,
-} from "@/lib/workoutGeneration";
+import { estimateDurationMinutes, toWorkoutExercise, type WorkoutTypeOption } from "@/lib/workoutGeneration";
 import type { Exercise, WorkoutExercise } from "@/lib/types";
 
 function DraftExerciseCard({
   index,
   exercise,
   libraryExercise,
-  onChange,
+  swapCandidates,
+  onSwap,
   onRemove,
 }: {
   index: number;
   exercise: WorkoutExercise;
   libraryExercise?: Exercise;
-  onChange: (next: WorkoutExercise) => void;
+  swapCandidates: Exercise[];
+  onSwap: (next: Exercise) => void;
   onRemove: () => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const isCardio = exercise.exerciseType === "cardio";
-  const setsCount = exercise.sets.length;
-  const reps = exercise.sets[0]?.reps ?? DEFAULT_REPS;
-  const weight = exercise.sets[0]?.weight;
-
-  function regenerate(patch: { setsCount?: number; reps?: number; weight?: number }) {
-    onChange({
-      ...exercise,
-      sets: buildDefaultSets(
-        exercise.exerciseType,
-        patch.setsCount ?? setsCount,
-        patch.reps ?? reps,
-        "weight" in patch ? patch.weight : weight,
-      ),
-    });
-  }
+  const [isSwapping, setIsSwapping] = useState(false);
 
   return (
     <Card variant="outline">
@@ -65,11 +45,11 @@ function DraftExerciseCard({
         <div className="flex shrink-0 gap-1">
           <button
             type="button"
-            onClick={() => setIsEditing((v) => !v)}
-            aria-label={`Edit ${exercise.name}`}
-            aria-pressed={isEditing}
+            onClick={() => setIsSwapping((v) => !v)}
+            aria-label={`Swap ${exercise.name}`}
+            aria-pressed={isSwapping}
             className={
-              isEditing
+              isSwapping
                 ? "flex size-8 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue"
                 : "flex size-8 items-center justify-center rounded-full text-muted hover:text-ink"
             }
@@ -87,45 +67,17 @@ function DraftExerciseCard({
         </div>
       </div>
 
-      {isEditing && (
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-hairline pt-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted">Sets</span>
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={setsCount}
-              onChange={(e) => regenerate({ setsCount: Math.max(1, Number(e.target.value) || 1) })}
-              className="h-9"
-            />
-          </label>
-          {!isCardio && (
-            <>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted">Reps</span>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  value={reps}
-                  onChange={(e) => regenerate({ reps: Math.max(1, Number(e.target.value) || 1) })}
-                  className="h-9"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-muted">Starting weight</span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="Optional"
-                  value={weight ?? ""}
-                  onChange={(e) => regenerate({ weight: e.target.value ? Number(e.target.value) : undefined })}
-                  className="h-9"
-                />
-              </label>
-            </>
-          )}
+      {isSwapping && (
+        <div className="mt-3 border-t border-hairline pt-3">
+          <ExercisePicker
+            exercises={swapCandidates}
+            onSelect={(next) => {
+              onSwap(next);
+              setIsSwapping(false);
+            }}
+            placeholder="Search a replacement…"
+            autoFocus
+          />
         </div>
       )}
     </Card>
@@ -235,7 +187,8 @@ export function WorkoutDraftModal({
                 index={index}
                 exercise={exercise}
                 libraryExercise={library.find((ex) => ex.id === exercise.exerciseId)}
-                onChange={(next) => onUpdateExercise(index, next)}
+                swapCandidates={availableToAdd}
+                onSwap={(next) => onUpdateExercise(index, toWorkoutExercise(next))}
                 onRemove={() => onRemoveExercise(index)}
               />
             ))}
@@ -255,8 +208,9 @@ export function WorkoutDraftModal({
           <div className="mt-3">
             <ExercisePicker
               exercises={availableToAdd}
-              onAdd={(ex) => onAddExercise(ex)}
-              placeholder="Add an exercise…"
+              onSelect={(ex) => onAddExercise(ex)}
+              placeholder="Search exercises to add…"
+              autoFocus
             />
           </div>
         )}

@@ -1,60 +1,72 @@
-import { useMemo, useState } from "react";
-import { Plus } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/Button";
-import { categoryLabel } from "@/lib/exerciseLabels";
+import { useState } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
+import { Input } from "@/components/ui/Input";
 import type { Exercise } from "@/lib/types";
 
 interface ExercisePickerProps {
   exercises: Exercise[];
-  onAdd: (exercise: Exercise) => void;
+  onSelect: (exercise: Exercise) => void;
   placeholder?: string;
+  autoFocus?: boolean;
 }
 
-export function ExercisePicker({ exercises, onAdd, placeholder = "Add an exercise…" }: ExercisePickerProps) {
-  const [pickedId, setPickedId] = useState("");
+function matchesQuery(exercise: Exercise, query: string) {
+  const haystack = `${exercise.name} ${exercise.muscleGroups.join(" ")}`.toLowerCase();
+  return haystack.includes(query);
+}
 
-  const byCategory = useMemo(() => {
-    const groups = new Map<string, Exercise[]>();
-    for (const ex of exercises) {
-      const group = groups.get(ex.category) ?? [];
-      group.push(ex);
-      groups.set(ex.category, group);
-    }
-    for (const group of groups.values()) {
-      group.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [exercises]);
-
-  function handleAdd() {
-    const picked = exercises.find((ex) => ex.id === pickedId);
-    if (!picked) return;
-    onAdd(picked);
-    setPickedId("");
-  }
+export function ExercisePicker({
+  exercises,
+  onSelect,
+  placeholder = "Search exercises…",
+  autoFocus,
+}: ExercisePickerProps) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const matches = normalizedQuery
+    ? exercises.filter((ex) => matchesQuery(ex, normalizedQuery)).slice(0, 8)
+    : [];
 
   return (
-    <div className="flex gap-2">
-      <select
-        value={pickedId}
-        onChange={(e) => setPickedId(e.target.value)}
-        className="h-10 w-full rounded-md border border-hairline bg-canvas px-3.5 text-sm text-ink outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
-      >
-        <option value="">{placeholder}</option>
-        {byCategory.map(([cat, exs]) => (
-          <optgroup key={cat} label={categoryLabel(cat)}>
-            {exs.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.name}
-              </option>
+    <div>
+      <div className="relative">
+        <MagnifyingGlass
+          size={16}
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
+        />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="pl-9"
+          autoFocus={autoFocus}
+        />
+      </div>
+
+      {normalizedQuery &&
+        (matches.length === 0 ? (
+          <p className="mt-2 px-1 text-xs text-muted">No matching exercises.</p>
+        ) : (
+          <ul className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-hairline">
+            {matches.map((ex, i) => (
+              <li key={ex.id} className={i > 0 ? "border-t border-hairline" : ""}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(ex);
+                    setQuery("");
+                  }}
+                  className="flex w-full flex-col items-start gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-surface-soft"
+                >
+                  <span className="text-sm font-medium text-ink">{ex.name}</span>
+                  {ex.muscleGroups.length > 0 && (
+                    <span className="text-xs text-muted">{ex.muscleGroups.join(", ")}</span>
+                  )}
+                </button>
+              </li>
             ))}
-          </optgroup>
+          </ul>
         ))}
-      </select>
-      <Button onClick={handleAdd} disabled={!pickedId}>
-        <Plus size={16} weight="bold" />
-        Add
-      </Button>
     </div>
   );
 }
