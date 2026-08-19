@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Barbell, CaretLeft, CaretRight, CheckCircle, Minus, Plus, Trash, X } from "@phosphor-icons/react";
+import {
+  Barbell,
+  CaretDown,
+  CaretLeft,
+  CaretRight,
+  CaretUp,
+  CheckCircle,
+  Minus,
+  Plus,
+  Trash,
+  X,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -65,6 +76,61 @@ function Stepper({
   );
 }
 
+function CompletedSetRow({ set, index, isCardio }: { set: WorkoutSet; index: number; isCardio: boolean }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="border-t border-hairline first:border-t-0">
+      <button
+        type="button"
+        onClick={() => setIsExpanded((v) => !v)}
+        className="flex w-full items-center justify-between px-3.5 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 text-sm text-ink">
+          <CheckCircle size={16} weight="fill" className="text-brand-blue" />
+          Set {index + 1} completed
+        </span>
+        {isExpanded ? (
+          <CaretUp size={16} className="text-muted" />
+        ) : (
+          <CaretDown size={16} className="text-muted" />
+        )}
+      </button>
+      {isExpanded && (
+        <div className="flex flex-col gap-1 px-3.5 pb-3 text-sm">
+          {isCardio ? (
+            <>
+              {set.distance != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted">Distance:</span>
+                  <span className="text-ink">{set.distance} mi</span>
+                </div>
+              )}
+              {set.duration != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted">Duration:</span>
+                  <span className="text-ink">{set.duration} min</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted">Weight:</span>
+                <span className="text-ink">{set.weight ?? 0} lbs</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Reps:</span>
+                <span className="text-ink">{set.reps ?? 0} reps</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ActiveWorkout({
   session,
   userId,
@@ -82,7 +148,6 @@ export function ActiveWorkout({
   const [currentSetIndex, setCurrentSetIndex] = useState(() =>
     firstIncompleteSetIndex(session.exercises[firstUnfinishedExerciseIndex(session.exercises)]?.sets ?? []),
   );
-  const [showSkipSetsWarning, setShowSkipSetsWarning] = useState(false);
   const [showFinishWorkoutWarning, setShowFinishWorkoutWarning] = useState(false);
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -133,7 +198,6 @@ export function ActiveWorkout({
     const clamped = Math.max(0, Math.min(index, exercises.length - 1));
     setCurrentIndex(clamped);
     setCurrentSetIndex(firstIncompleteSetIndex(exercises[clamped]?.sets ?? []));
-    setShowSkipSetsWarning(false);
   }
 
   function advanceToNextExercise(fromIndex: number) {
@@ -189,25 +253,6 @@ export function ActiveWorkout({
     updateCurrentSet({ weight: bodyweight });
   }
 
-  function addSet() {
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i !== currentIndex
-          ? ex
-          : { ...ex, sets: [...ex.sets, { setNumber: ex.sets.length + 1, completed: false }] },
-      ),
-    );
-  }
-
-  function removeCurrentSet() {
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i !== currentIndex ? ex : { ...ex, sets: ex.sets.filter((_, si) => si !== currentSetIndex) },
-      ),
-    );
-    setCurrentSetIndex((prev) => Math.max(0, prev - 1));
-  }
-
   function addExerciseToWorkout(exercise: Exercise) {
     setExercises((prev) => [...prev, toWorkoutExercise(exercise)]);
     setShowAddExercise(false);
@@ -235,18 +280,6 @@ export function ActiveWorkout({
     } else {
       setCurrentSetIndex(nextIncomplete);
     }
-  }
-
-  function handleSkipRemainingSets() {
-    const current = exercises[currentIndex];
-    if (!current) return;
-    if (!showSkipSetsWarning) {
-      setShowSkipSetsWarning(true);
-      return;
-    }
-    setExercises((prev) => prev.map((ex, i) => (i !== currentIndex ? ex : { ...ex, finished: true })));
-    setShowSkipSetsWarning(false);
-    advanceToNextExercise(currentIndex);
   }
 
   function doFinishWorkout() {
@@ -295,6 +328,7 @@ export function ActiveWorkout({
 
   const current = exercises[currentIndex];
   const currentSet = current?.sets[currentSetIndex];
+  const showEditor = !!currentSet && !currentSet.completed;
   const isCardio = current?.exerciseType === "cardio";
   const addedIds = new Set(exercises.map((ex) => ex.exerciseId));
   const availableToAdd = (library ?? []).filter((ex) => !addedIds.has(ex.id));
@@ -392,7 +426,7 @@ export function ActiveWorkout({
               </div>
               <p className="mb-4 text-xs text-muted">{current.finished ? "Finished" : "Current exercise"}</p>
 
-              {currentSet ? (
+              {showEditor && currentSet && (
                 <div className="rounded-lg bg-surface-soft p-4">
                   <p className="mb-3 text-sm font-semibold text-ink">Set {currentSetIndex + 1}</p>
 
@@ -443,55 +477,24 @@ export function ActiveWorkout({
                     </div>
                   )}
 
-                  <Button
-                    variant="primary"
-                    className="mt-4 w-full"
-                    onClick={completeCurrentSet}
-                    disabled={currentSet.completed}
-                  >
+                  <Button variant="primary" className="mt-4 w-full" onClick={completeCurrentSet}>
                     <CheckCircle size={16} weight="bold" />
-                    {currentSet.completed ? "Set complete" : "Complete Set"}
+                    Complete Set
                   </Button>
                 </div>
-              ) : (
-                <EmptyState
-                  icon={<Barbell size={20} />}
-                  title="No sets yet"
-                  description="Add a set to start logging."
-                />
               )}
 
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex gap-3">
-                  <Button variant="text" size="sm" onClick={addSet}>
-                    <Plus size={14} weight="bold" />
-                    Add set
-                  </Button>
-                  {current.sets.length > 1 && (
-                    <Button variant="text" size="sm" className="text-muted" onClick={removeCurrentSet}>
-                      Remove set
-                    </Button>
+              {current.sets.some((s) => s.completed) && (
+                <div className={cn("rounded-lg border border-hairline", showEditor && "mt-3")}>
+                  {current.sets.map(
+                    (set, i) =>
+                      set.completed && <CompletedSetRow key={i} set={set} index={i} isCardio={isCardio} />,
                   )}
                 </div>
-                {!current.finished && current.sets.some((s) => !s.completed) && (
-                  <Button variant="text" size="sm" className="text-muted" onClick={handleSkipRemainingSets}>
-                    Skip remaining sets
-                  </Button>
-                )}
-              </div>
+              )}
 
-              {showSkipSetsWarning && (
-                <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2">
-                  <p className="text-xs text-ink">Some sets are incomplete. Skip anyway?</p>
-                  <div className="flex shrink-0 gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setShowSkipSetsWarning(false)}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={handleSkipRemainingSets}>
-                      Skip
-                    </Button>
-                  </div>
-                </div>
+              {!currentSet && (
+                <EmptyState icon={<Barbell size={20} />} title="No sets yet" description="This exercise has no sets." />
               )}
             </Card>
           )}

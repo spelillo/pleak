@@ -45,21 +45,22 @@ export function Workout() {
         (activeSession ? (
           <ActiveWorkout session={activeSession} userId={userId} onFinished={setSummary} />
         ) : (
-          <div className="mb-8">
-            <EmptyState
-              icon={<Barbell size={22} />}
-              title="No active workout"
-              description="Start a workout to begin logging exercises and sets."
-              action={
-                <Button variant="primary" onClick={() => setShowStartModal(true)}>
-                  Start workout
-                </Button>
-              }
-            />
-          </div>
+          <>
+            <div className="mb-8">
+              <EmptyState
+                icon={<Barbell size={22} />}
+                title="No active workout"
+                description="Start a workout to begin logging exercises and sets."
+                action={
+                  <Button variant="primary" onClick={() => setShowStartModal(true)}>
+                    Start workout
+                  </Button>
+                }
+              />
+            </div>
+            <ExerciseLibrary />
+          </>
         ))}
-
-      <ExerciseLibrary />
 
       {showStartModal && (
         <WorkoutStartModal
