@@ -6,17 +6,15 @@ export type PrimaryTarget = (typeof PRIMARY_TARGETS)[number];
 export const MOVEMENT_TYPES = ["Push", "Pull", "Legs"] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
 
-export type WorkoutSelection =
-  | { kind: "target"; value: PrimaryTarget }
-  | { kind: "movement"; value: MovementType };
-
 export const DEFAULT_EXERCISE_COUNT = 5;
 export const DEFAULT_SETS = 3;
 export const DEFAULT_REPS = 10;
 export const WEIGHT_INCREMENT = 5;
+export const REPS_INCREMENT = 1;
+export const MINUTES_PER_SET_ESTIMATE = 3.5;
 
 // Buckets the fine-grained muscle groups seeded on weightlifting exercises
-// into the seven broad "primary target" categories the setup screen offers.
+// into the seven broad "primary target" categories.
 const MUSCLE_GROUP_TO_TARGET: Record<string, PrimaryTarget> = {
   Chest: "Chest",
   Back: "Back",
@@ -34,24 +32,30 @@ export function muscleGroupToTarget(muscleGroup: string): PrimaryTarget | null {
   return MUSCLE_GROUP_TO_TARGET[muscleGroup] ?? null;
 }
 
-export function matchesTarget(exercise: Exercise, target: PrimaryTarget): boolean {
-  return (
-    exercise.category === "weightlifting" &&
-    exercise.muscleGroups.some((mg) => muscleGroupToTarget(mg) === target)
-  );
+export interface WorkoutTypeOption {
+  id: string;
+  label: string;
+  description: string;
+  movementType?: MovementType;
+  targets?: PrimaryTarget[];
 }
 
-export function matchesMovement(exercise: Exercise, movement: MovementType): boolean {
-  return exercise.category === "weightlifting" && exercise.movementType === movement;
-}
+// The five workout types offered on the setup screen. Push/Pull/Legs match
+// on the exercise's movementType tag; the muscle-group splits match on any
+// of their listed primary targets.
+export const WORKOUT_TYPES: WorkoutTypeOption[] = [
+  { id: "push", label: "Push", description: "Chest, shoulders, triceps", movementType: "Push" },
+  { id: "pull", label: "Pull", description: "Back, biceps", movementType: "Pull" },
+  { id: "legs", label: "Legs", description: "Quads, hamstrings, glutes", movementType: "Legs" },
+  { id: "chest-back", label: "Chest/Back", description: "Upper body focus", targets: ["Chest", "Back"] },
+  { id: "arms", label: "Arms", description: "Biceps, triceps", targets: ["Arms"] },
+];
 
-export function selectionLabel(selection: WorkoutSelection): string {
-  return selection.value;
-}
-
-export function filterBySelection(pool: Exercise[], selection: WorkoutSelection): Exercise[] {
-  return pool.filter((ex) =>
-    selection.kind === "target" ? matchesTarget(ex, selection.value) : matchesMovement(ex, selection.value),
+export function matchesWorkoutType(exercise: Exercise, type: WorkoutTypeOption): boolean {
+  if (exercise.category !== "weightlifting") return false;
+  if (type.movementType) return exercise.movementType === type.movementType;
+  return (type.targets ?? []).some((target) =>
+    exercise.muscleGroups.some((mg) => muscleGroupToTarget(mg) === target),
   );
 }
 
@@ -88,11 +92,16 @@ export function toWorkoutExercise(exercise: Exercise): WorkoutExercise {
 
 export function generateDraftExercises(
   pool: Exercise[],
-  selection: WorkoutSelection,
+  type: WorkoutTypeOption,
   count: number = DEFAULT_EXERCISE_COUNT,
 ): WorkoutExercise[] {
-  const matching = filterBySelection(pool, selection);
+  const matching = pool.filter((ex) => matchesWorkoutType(ex, type));
   return shuffle(matching)
     .slice(0, count)
     .map(toWorkoutExercise);
+}
+
+export function estimateDurationMinutes(exercises: WorkoutExercise[]): number {
+  const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
+  return Math.max(5, Math.round((totalSets * MINUTES_PER_SET_ESTIMATE) / 5) * 5);
 }

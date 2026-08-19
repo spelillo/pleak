@@ -1,8 +1,11 @@
+import { useState } from "react";
+import type { FocusEvent } from "react";
 import { Sun, Moon, Desktop, SignOut } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { useTheme } from "@/contexts/theme-context";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/cn";
@@ -15,7 +18,17 @@ const themeOptions = [
 
 export function Profile() {
   const { theme, setTheme } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateProfile } = useAuth();
+  const [weightInput, setWeightInput] = useState(() => user?.weight?.toString() ?? "");
+  const [isSavingWeight, setIsSavingWeight] = useState(false);
+
+  function handleWeightBlur(e: FocusEvent<HTMLInputElement>) {
+    const value = e.target.value.trim();
+    const nextWeight = value ? Number(value) : undefined;
+    if (nextWeight === user?.weight) return;
+    setIsSavingWeight(true);
+    updateProfile({ weight: nextWeight }).finally(() => setIsSavingWeight(false));
+  }
 
   return (
     <div>
@@ -31,6 +44,25 @@ export function Profile() {
           <SignOut size={16} />
           Sign out
         </Button>
+      </Card>
+
+      <h2 className="mb-3 text-sm font-semibold text-ink">Body weight</h2>
+      <Card variant="outline" className="mb-6">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted">Used to quick-fill bodyweight movements during a workout</span>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              inputMode="decimal"
+              placeholder="e.g. 155"
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              onBlur={handleWeightBlur}
+              className="max-w-32"
+            />
+            <span className="text-sm text-muted">lb{isSavingWeight && " · Saving…"}</span>
+          </div>
+        </label>
       </Card>
 
       <h2 className="mb-3 text-sm font-semibold text-ink">Appearance</h2>

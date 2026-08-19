@@ -1,11 +1,18 @@
-import { Link } from "wouter";
+import { useState } from "react";
+import { useLocation } from "wouter";
 import { Barbell, CalendarBlank } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { WorkoutStartModal } from "@/components/workout/WorkoutStartModal";
+import { useAuth } from "@/contexts/auth-context";
 
 export function Home() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [showStartModal, setShowStartModal] = useState(false);
+
   return (
     <div>
       <PageHeader title="Home" description="Your workouts, tracked simply." />
@@ -15,12 +22,10 @@ export function Home() {
           <p className="text-sm font-semibold text-ink">Start a workout</p>
           <p className="text-sm text-muted">Jump straight into logging sets.</p>
         </div>
-        <Link href="/workout">
-          <Button variant="primary">
-            <Barbell size={16} weight="bold" />
-            Start
-          </Button>
-        </Link>
+        <Button variant="primary" onClick={() => setShowStartModal(true)}>
+          <Barbell size={16} weight="bold" />
+          Start
+        </Button>
       </Card>
 
       <h2 className="mb-3 text-sm font-semibold text-ink">This week</h2>
@@ -34,6 +39,18 @@ export function Home() {
           </Button>
         }
       />
+
+      {showStartModal && (
+        <WorkoutStartModal
+          userId={user!.id}
+          username={user!.displayName}
+          onClose={() => setShowStartModal(false)}
+          onStarted={() => {
+            setShowStartModal(false);
+            setLocation("/workout");
+          }}
+        />
+      )}
     </div>
   );
 }

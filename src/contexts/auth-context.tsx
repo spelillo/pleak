@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { loginWithGoogle } from "@/lib/auth-api";
-import { ApiError } from "@/lib/api";
+import { apiPost, ApiError } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 const STORAGE_KEY = "pleak-user";
@@ -35,6 +35,7 @@ interface AuthContextType {
   isGoogleReady: boolean;
   renderSignInButton: (el: HTMLElement) => void;
   signOut: () => void;
+  updateProfile: (patch: Partial<Pick<User, "weight" | "height" | "age" | "sex" | "dateOfBirth">>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -97,8 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.google?.accounts.id.disableAutoSelect();
   }
 
+  async function updateProfile(
+    patch: Partial<Pick<User, "weight" | "height" | "age" | "sex" | "dateOfBirth">>,
+  ) {
+    if (!user) return;
+    const updated = await apiPost<User>("users", "update", { id: user.id, ...patch });
+    setUser(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, isGoogleReady, renderSignInButton, signOut }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, error, isGoogleReady, renderSignInButton, signOut, updateProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { WarningCircle } from "@phosphor-icons/react";
+import { Barbell, WarningCircle } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ExerciseLibrary } from "@/components/workout/ExerciseLibrary";
-import { WorkoutStartFlow } from "@/components/workout/WorkoutStartFlow";
+import { WorkoutStartModal } from "@/components/workout/WorkoutStartModal";
 import { ActiveWorkout } from "@/components/workout/ActiveWorkout";
 import { WorkoutSummaryModal, type WorkoutSummary } from "@/components/workout/WorkoutSummaryModal";
 import { useWorkoutSessions } from "@/lib/queries/workoutSessions";
@@ -18,6 +20,7 @@ export function Workout() {
   const { data: sessions, isLoading, isError, error } = useWorkoutSessions(userId);
   const activeSession = sessions?.find((s) => s.isActive);
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
+  const [showStartModal, setShowStartModal] = useState(false);
 
   return (
     <div>
@@ -42,10 +45,30 @@ export function Workout() {
         (activeSession ? (
           <ActiveWorkout session={activeSession} userId={userId} onFinished={setSummary} />
         ) : (
-          <WorkoutStartFlow userId={userId} username={user!.displayName} />
+          <div className="mb-8">
+            <EmptyState
+              icon={<Barbell size={22} />}
+              title="No active workout"
+              description="Start a workout to begin logging exercises and sets."
+              action={
+                <Button variant="primary" onClick={() => setShowStartModal(true)}>
+                  Start workout
+                </Button>
+              }
+            />
+          </div>
         ))}
 
       <ExerciseLibrary />
+
+      {showStartModal && (
+        <WorkoutStartModal
+          userId={userId}
+          username={user!.displayName}
+          onClose={() => setShowStartModal(false)}
+          onStarted={() => setShowStartModal(false)}
+        />
+      )}
 
       {summary && (
         <WorkoutSummaryModal

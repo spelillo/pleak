@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { CheckCircle, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 
 export interface WorkoutSummary {
   name: string;
@@ -21,26 +21,9 @@ export function WorkoutSummaryModal({
   onClose: () => void;
   onViewHistory: () => void;
 }) {
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 md:items-center"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg bg-canvas p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Workout summary"
-      >
+    <Modal onClose={onClose} ariaLabel="Workout summary" className="p-6">
+      <div>
         <div className="mb-4 flex items-start justify-between">
           <div className="flex size-11 items-center justify-center rounded-full bg-surface-card text-brand-blue">
             <CheckCircle size={24} weight="fill" />
@@ -90,6 +73,6 @@ export function WorkoutSummaryModal({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
