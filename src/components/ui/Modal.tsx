@@ -20,7 +20,7 @@ export function Modal({ onClose, children, className, ariaLabel }: ModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 md:items-center"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-4 pb-24 md:items-center md:pb-4"
       onClick={onClose}
     >
       <div
