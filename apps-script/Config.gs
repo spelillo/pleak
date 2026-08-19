@@ -39,7 +39,7 @@ var RESOURCES = {
   },
   exercises: {
     sheet: 'Exercises',
-    headers: ['id', 'name', 'category', 'exerciseType', 'muscleGroups', 'instructions', 'equipment', 'userId', 'createdAt'],
+    headers: ['id', 'name', 'category', 'exerciseType', 'muscleGroups', 'movementType', 'instructions', 'equipment', 'userId', 'createdAt'],
     json: ['muscleGroups'],
     bool: [],
   },

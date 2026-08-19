@@ -11,19 +11,20 @@ these steps are for you to run. Takes about 5 minutes.
 
 ## 2. Add the script
 
-The API is split across six small files under [`apps-script/`](../apps-script/)
-— `Config.gs`, `Setup.gs`, `Router.gs`, `SheetHelpers.gs`, `CrudHelpers.gs`,
-`Auth.gs` — each under 100 lines so it pastes cleanly. They all share one
-global scope, so it doesn't matter what order you add them in.
+The API is split across several small files under
+[`apps-script/`](../apps-script/) — `Config.gs`, `Setup.gs`, `Router.gs`,
+`SheetHelpers.gs`, `CrudHelpers.gs`, `Auth.gs`, `SeedExercises.gs` — each
+under 100 lines so it pastes cleanly. They all share one global scope, so
+it doesn't matter what order you add them in.
 
 1. In the Sheet, go to **Extensions → Apps Script**. This opens the Apps
    Script editor in a new tab, already linked to this Sheet.
 2. Delete the placeholder content in the default `Code.gs` file, then either
    rename it to `Config.gs` or delete it entirely — either way you'll end up
-   with six files matching the ones in the repo.
-3. For each of the six files in `apps-script/`: create a new script file in
-   the editor (the `+` next to "Files") named to match (e.g. `Config`), and
-   paste in that file's full contents.
+   with one file per file in the repo.
+3. For each file in `apps-script/`: create a new script file in the editor
+   (the `+` next to "Files") named to match (e.g. `Config`), and paste in
+   that file's full contents.
 4. In `Config.gs`, set `GOOGLE_CLIENT_ID` and `ALLOWED_EMAILS` — see
    [google-signin-setup.md](google-signin-setup.md) for where the client ID
    comes from. Every Google account that should be able to sign in needs its
@@ -43,6 +44,14 @@ global scope, so it doesn't matter what order you add them in.
    `WorkoutPlans`, `WorkoutSessions`, `ScheduledWorkouts`, `Goals`,
    `PersonalRecords`, `WeeklyWorkoutPlans`, `WeeklyPlanDays`, and
    `WeeklyPlanCompletions`, each with a header row.
+
+## 3b. Seed the exercise library
+
+1. In the toolbar dropdown, select **`seedExercises`**.
+2. Click **Run** (▶).
+3. This fills the `Exercises` tab with the weightlifting and functional
+   exercise library. Safe to re-run — it skips any exercise name already
+   present, so it won't create duplicates.
 
 ## 4. Deploy as a Web App
 
@@ -76,3 +85,20 @@ manually paste the new version into the matching file in the Apps Script
 editor and create a **new deployment version** (Deploy → Manage deployments
 → edit (pencil) → New version → Deploy) — saving the file alone does not
 update the live `/exec` URL.
+
+## Adding a column to an existing sheet
+
+`setup()` only creates the header row for a tab it's creating fresh — it
+won't retroactively add a new column to a tab that already exists (checked
+via `sheet.getLastRow() === 0`, which is false once a header row exists).
+When a `Config.gs` header list gains a new field (like `movementType` on
+`Exercises`), and the tab has no real data in it yet, the simplest fix is:
+
+1. Right-click the tab (e.g. `Exercises`) at the bottom of the Sheet →
+   **Delete**.
+2. Re-run `setup` — it recreates the tab with the current header list.
+3. Re-run any seed function for that tab (e.g. `seedExercises`).
+
+If the tab already has real data you don't want to lose, add the column
+manually instead: insert a new column at the same position it has in
+`Config.gs`'s `headers` array, and title it to match exactly.

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
-import type { WorkoutSession } from "@/lib/types";
+import type { WorkoutExercise, WorkoutSession } from "@/lib/types";
 
 function sessionsKey(userId: string) {
   return ["workoutSessions", userId] as const;
@@ -17,13 +17,13 @@ export function useWorkoutSessions(userId: string | undefined) {
 export function useStartWorkoutSession(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { username: string; name: string }) =>
+    mutationFn: (input: { username: string; name: string; exercises: WorkoutExercise[] }) =>
       apiPost<WorkoutSession>("workoutSessions", "create", {
         userId,
         username: input.username,
         name: input.name,
         startTime: new Date().toISOString(),
-        exercises: [],
+        exercises: input.exercises,
         isActive: true,
       }),
     onSuccess: () => {

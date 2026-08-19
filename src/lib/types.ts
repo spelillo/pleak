@@ -23,6 +23,7 @@ export interface Exercise {
   category: string; // weightlifting, cardio, functional, stretch-recovery
   exerciseType: "weights" | "cardio" | "stretch";
   muscleGroups: string[];
+  movementType?: "Push" | "Pull" | "Legs"; // weightlifting exercises only
   instructions?: string;
   equipment?: string;
   userId?: string | null; // null/absent = system exercise
@@ -44,6 +45,7 @@ export interface WorkoutExercise {
   name: string;
   exerciseType: string;
   sets: WorkoutSet[];
+  finished?: boolean; // set when the user taps "Finish exercise", regardless of whether every set is complete
 }
 
 export interface WorkoutPlan {
