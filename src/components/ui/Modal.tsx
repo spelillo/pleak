@@ -25,7 +25,7 @@ export function Modal({ onClose, children, className, ariaLabel }: ModalProps) {
     >
       <div
         className={cn(
-          "flex max-h-[85vh] w-full max-w-sm flex-col overflow-hidden rounded-lg bg-canvas shadow-lg",
+          "flex max-h-[calc(100vh-7rem)] w-full max-w-sm flex-col overflow-hidden rounded-lg bg-canvas shadow-lg md:max-h-[85vh]",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
