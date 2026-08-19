@@ -44,13 +44,29 @@ function firstUnfinishedExerciseIndex(exercises: WorkoutExercise[]) {
   return index === -1 ? 0 : index;
 }
 
+// A fresh next set carries over the previous set's weight/reps (or
+// distance/duration for cardio) rather than resetting to blank.
+function nextSetFrom(sets: WorkoutSet[]): WorkoutSet {
+  const last = sets[sets.length - 1];
+  return {
+    setNumber: sets.length + 1,
+    completed: false,
+    weight: last?.weight,
+    reps: last?.reps,
+    distance: last?.distance,
+    duration: last?.duration,
+  };
+}
+
 function Stepper({
   value,
   onStep,
+  onChange,
   step,
 }: {
-  value: number;
+  value: number | undefined;
   onStep: (delta: number) => void;
+  onChange: (value: number | undefined) => void;
   step: number;
 }) {
   return (
@@ -63,7 +79,13 @@ function Stepper({
       >
         <Minus size={16} />
       </button>
-      <span className="flex-1 text-center text-2xl font-semibold text-ink">{value}</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value ? Math.max(0, Number(e.target.value)) : undefined)}
+        className="h-11 min-w-0 flex-1 rounded-md border border-hairline bg-canvas text-center text-xl font-semibold text-ink outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+      />
       <button
         type="button"
         onClick={() => onStep(step)}
@@ -194,18 +216,29 @@ export function ActiveWorkout({
   const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
   const bodyweight = user?.weight;
 
+  // Navigating to an exercise whose sets are all already complete opens a
+  // fresh set (carried-over weight/reps) rather than a read-only view —
+  // there's no cap on sets, so you can always add another.
   function goToExercise(index: number) {
     const clamped = Math.max(0, Math.min(index, exercises.length - 1));
-    setCurrentIndex(clamped);
-    setCurrentSetIndex(firstIncompleteSetIndex(exercises[clamped]?.sets ?? []));
+    const target = exercises[clamped];
+    if (target && target.sets.length > 0 && target.sets.every((s) => s.completed)) {
+      const newSet = nextSetFrom(target.sets);
+      setExercises((prev) => prev.map((ex, i) => (i !== clamped ? ex : { ...ex, sets: [...ex.sets, newSet] })));
+      setCurrentIndex(clamped);
+      setCurrentSetIndex(target.sets.length);
+    } else {
+      setCurrentIndex(clamped);
+      setCurrentSetIndex(firstIncompleteSetIndex(target?.sets ?? []));
+    }
   }
 
-  function advanceToNextExercise(fromIndex: number) {
-    let next = exercises.findIndex((ex, i) => i > fromIndex && !ex.finished);
-    if (next === -1) next = exercises.findIndex((ex, i) => i !== fromIndex && !ex.finished);
-    if (next === -1) next = fromIndex;
-    setCurrentIndex(next);
-    setCurrentSetIndex(firstIncompleteSetIndex(exercises[next]?.sets ?? []));
+  function handleNextExercise() {
+    const finishingIndex = currentIndex;
+    setExercises((prev) => prev.map((ex, i) => (i !== finishingIndex ? ex : { ...ex, finished: true })));
+    if (currentIndex < exercises.length - 1) {
+      goToExercise(currentIndex + 1);
+    }
   }
 
   function updateCurrentSet(patch: Partial<WorkoutSet>) {
@@ -262,24 +295,36 @@ export function ActiveWorkout({
     setExercises((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Completing a set never advances to the next exercise or marks it
+  // finished — that only happens via "Next Exercise". If this was the
+  // last set, a new one is appended (carrying over weight/reps) instead
+  // of stopping, since there's no cap on how many sets an exercise can have.
   function completeCurrentSet() {
     const current = exercises[currentIndex];
     if (!current) return;
     const set = current.sets[currentSetIndex];
     if (!set) return;
-    const updatedSets = current.sets.map((s, i) => (i === currentSetIndex ? { ...s, completed: true } : s));
-    const nextIncomplete = updatedSets.findIndex((s) => !s.completed);
-    const allDone = nextIncomplete === -1;
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i !== currentIndex ? ex : { ...ex, sets: updatedSets, finished: allDone ? true : ex.finished },
-      ),
-    );
-    if (allDone) {
-      advanceToNextExercise(currentIndex);
+    const completedSet = { ...set, completed: true };
+    let sets = current.sets.map((s, i) => (i === currentSetIndex ? completedSet : s));
+    let nextIndex = sets.findIndex((s) => !s.completed);
+    if (nextIndex === -1) {
+      sets = [...sets, nextSetFrom(sets)];
+      nextIndex = sets.length - 1;
     } else {
-      setCurrentSetIndex(nextIncomplete);
+      sets = sets.map((s, i) =>
+        i !== nextIndex
+          ? s
+          : {
+              ...s,
+              weight: completedSet.weight,
+              reps: completedSet.reps,
+              distance: completedSet.distance,
+              duration: completedSet.duration,
+            },
+      );
     }
+    setExercises((prev) => prev.map((ex, i) => (i !== currentIndex ? ex : { ...ex, sets })));
+    setCurrentSetIndex(nextIndex);
   }
 
   function doFinishWorkout() {
@@ -459,7 +504,12 @@ export function ActiveWorkout({
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="mb-1.5 text-xs text-muted">Weight (lbs)</p>
-                        <Stepper value={currentSet.weight ?? 0} onStep={stepCurrentWeight} step={WEIGHT_INCREMENT} />
+                        <Stepper
+                          value={currentSet.weight}
+                          onStep={stepCurrentWeight}
+                          onChange={(v) => updateCurrentSet({ weight: v })}
+                          step={WEIGHT_INCREMENT}
+                        />
                         {bodyweight != null && (
                           <button
                             type="button"
@@ -472,7 +522,12 @@ export function ActiveWorkout({
                       </div>
                       <div>
                         <p className="mb-1.5 text-xs text-muted">Reps</p>
-                        <Stepper value={currentSet.reps ?? 0} onStep={stepCurrentReps} step={REPS_INCREMENT} />
+                        <Stepper
+                          value={currentSet.reps}
+                          onStep={stepCurrentReps}
+                          onChange={(v) => updateCurrentSet({ reps: v })}
+                          step={REPS_INCREMENT}
+                        />
                       </div>
                     </div>
                   )}
@@ -509,12 +564,7 @@ export function ActiveWorkout({
               <CaretLeft size={16} weight="bold" />
               Previous
             </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              onClick={() => goToExercise(currentIndex + 1)}
-              disabled={currentIndex === exercises.length - 1}
-            >
+            <Button variant="primary" className="flex-1" onClick={handleNextExercise}>
               Next Exercise
               <CaretRight size={16} weight="bold" />
             </Button>
