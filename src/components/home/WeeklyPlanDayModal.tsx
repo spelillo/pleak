@@ -63,8 +63,9 @@ export function WeeklyPlanDayModal({
   function handleSaveTypeOnly() {
     saveDay.mutate(
       { id: existing?.id, dayOfWeek, title: title || `${selectedType?.label} Day`, exercises: [] },
-      { onSuccess: onClose, onError: () => onError("Couldn't save your plan — check your connection.") },
+      { onError: () => onError("Couldn't save your plan — check your connection.") },
     );
+    onClose();
   }
 
   function handleGenerateAndCurate() {
@@ -84,16 +85,17 @@ export function WeeklyPlanDayModal({
   function handleSave() {
     saveDay.mutate(
       { id: existing?.id, dayOfWeek, title: title || "Workout", exercises: draft },
-      { onSuccess: onClose, onError: () => onError("Couldn't save your plan — check your connection.") },
+      { onError: () => onError("Couldn't save your plan — check your connection.") },
     );
+    onClose();
   }
 
   function handleDelete() {
     if (!existing) return;
     deleteDay.mutate(existing.id, {
-      onSuccess: onClose,
       onError: () => onError("Couldn't remove this plan — check your connection."),
     });
+    onClose();
   }
 
   function handleStartNow() {

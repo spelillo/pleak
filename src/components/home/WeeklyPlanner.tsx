@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { CalendarBlank, CaretLeft, CaretRight, CheckCircle, Plus } from "@phosphor-icons/react";
+import { CalendarBlank, CaretLeft, CaretRight, CheckCircle, CircleNotch, Plus } from "@phosphor-icons/react";
 import { motion, useReducedMotion } from "motion/react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -33,17 +33,24 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
   const [activeDay, setActiveDay] = useState<{ dayOfWeek: number; date: Date; existing: WeeklyPlanDay | null } | null>(
     null,
   );
+  // The only remaining unavoidable wait: the very first day ever planned has
+  // to create the WeeklyWorkoutPlan record before the modal can open, since
+  // every day references it. Everything after that is instant.
+  const [bootstrappingDay, setBootstrappingDay] = useState<number | null>(null);
 
   async function handleDayClick(dayOfWeek: number, date: Date) {
     const existing = daysByIndex.get(dayOfWeek) ?? null;
     let planId = activePlan?.id;
     if (!planId) {
+      setBootstrappingDay(dayOfWeek);
       try {
         const plan = await createPlan.mutateAsync("My Plan");
         planId = plan.id;
       } catch {
         onError("Couldn't set up your weekly plan — check your connection and try again.");
         return;
+      } finally {
+        setBootstrappingDay(null);
       }
     }
     setActiveDay({ dayOfWeek, date, existing });
@@ -103,7 +110,9 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
             >
               <span className={cn("text-xs", isToday ? "font-medium text-brand-blue" : "text-muted")}>{label}</span>
               <span className="text-base font-semibold text-ink">{date.getDate()}</span>
-              {planned ? (
+              {bootstrappingDay === i ? (
+                <CircleNotch size={18} className="animate-spin text-muted" />
+              ) : planned ? (
                 <CheckCircle size={18} weight="fill" className="text-brand-blue" />
               ) : (
                 <Plus size={18} className="text-muted" />
