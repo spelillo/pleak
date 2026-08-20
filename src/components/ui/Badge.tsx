@@ -17,7 +17,7 @@ export function Badge({ tone = "neutral", className, ...props }: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-pill px-3 py-1 text-xs font-medium",
+        "label-tracked inline-flex items-center rounded-pill px-3 py-1 text-xs font-medium",
         tones[tone],
         className,
       )}

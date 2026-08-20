@@ -12,7 +12,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-canvas pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline/40 bg-canvas/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
       aria-label="Primary"
     >
       <div className="mx-auto flex max-w-md">
@@ -24,7 +24,7 @@ export function BottomNav() {
               key={item.path}
               href={item.path}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors",
+                "label-tracked flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors",
                 isActive ? "text-brand-blue" : "text-muted",
               )}
               aria-current={isActive ? "page" : undefined}

@@ -18,7 +18,7 @@ export function PillTabs({ options, value, onChange, className }: PillTabsProps)
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              "rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors",
+              "label-tracked rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors",
               isSelected ? "bg-canvas text-ink shadow-sm" : "text-muted hover:text-ink",
             )}
             aria-pressed={isSelected}

@@ -57,6 +57,13 @@
      matches the design system's xxs–xxl steps, so only the one-off
      section rhythm value needs its own named token. */
   --spacing-section: 96px;
+
+  /* Elevation: soft, low-opacity shadows for surfaces that should read as
+     resting above the page (vs. inset/recessed surfaces, which stay flat). */
+  --shadow-color: 17 17 17;
+  --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.04), 0 1px 1px rgb(var(--shadow-color) / 0.03);
+  --shadow-md: 0 4px 12px rgb(var(--shadow-color) / 0.06), 0 1px 2px rgb(var(--shadow-color) / 0.04);
+  --shadow-lg: 0 12px 32px rgb(var(--shadow-color) / 0.12), 0 2px 6px rgb(var(--shadow-color) / 0.06);
 }
 
 :root {
@@ -107,6 +114,12 @@ body {
   letter-spacing: -0.5px;
 }
 
+/* Small chrome labels (nav, pills, badges) read better with a touch of
+   positive tracking, mirroring the negative tracking on display type. */
+.label-tracked {
+  letter-spacing: 0.01em;
+}
+
 /* Dark mode: CSS-variable strategy (Section 8.A), toggled by a `.dark` /
    `.light` class on <html> (see ThemeProvider). Primary flips from
    black-on-white to white-on-black so the CTA keeps AA contrast against
@@ -126,6 +139,11 @@ body {
   --color-primary-active: #e5e7eb;
   --color-primary-disabled: #3f3f46;
   --color-on-primary: #111111;
+
+  /* Shadows need more contrast against a dark canvas to read as elevation. */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 1px rgb(0 0 0 / 0.2);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.36), 0 1px 2px rgb(0 0 0 / 0.24);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
 }
 
 /* System fallback only when the user hasn't explicitly chosen a mode. */
@@ -145,5 +163,8 @@ body {
     --color-primary-active: #e5e7eb;
     --color-primary-disabled: #3f3f46;
     --color-on-primary: #111111;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 1px rgb(0 0 0 / 0.2);
+    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.36), 0 1px 2px rgb(0 0 0 / 0.24);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
   }
 }

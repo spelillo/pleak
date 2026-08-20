@@ -9,7 +9,7 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 const variants: Record<Variant, string> = {
   soft: "bg-surface-card",
-  outline: "bg-canvas border border-hairline",
+  outline: "bg-canvas border border-hairline shadow-[var(--shadow-sm)]",
 };
 
 export function Card({ variant = "soft", className, ...props }: CardProps) {

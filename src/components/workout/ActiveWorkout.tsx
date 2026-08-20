@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { springDefault } from "@/lib/motion";
 import {
   Barbell,
   CaretDown,
@@ -71,16 +73,20 @@ function Stepper({
   onChange: (value: number | undefined) => void;
   step: number;
 }) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <div className="flex items-center gap-2">
-      <button
+      <motion.button
         type="button"
         onClick={() => onStep(-step)}
-        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors active:scale-[0.98]"
+        whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+        transition={springDefault}
+        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors"
         aria-label="Decrease"
       >
         <Minus size={16} />
-      </button>
+      </motion.button>
       <input
         type="number"
         inputMode="numeric"
@@ -88,14 +94,16 @@ function Stepper({
         onChange={(e) => onChange(e.target.value ? Math.max(0, Number(e.target.value)) : undefined)}
         className="h-11 min-w-0 flex-1 rounded-md border border-hairline bg-canvas text-center text-xl font-semibold text-ink outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
       />
-      <button
+      <motion.button
         type="button"
         onClick={() => onStep(step)}
-        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors active:scale-[0.98]"
+        whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+        transition={springDefault}
+        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors"
         aria-label="Increase"
       >
         <Plus size={16} />
-      </button>
+      </motion.button>
     </div>
   );
 }
@@ -416,25 +424,34 @@ export function ActiveWorkout({
   const addedIds = new Set(exercises.map((ex) => ex.exerciseId));
   const availableToAdd = (library ?? []).filter((ex) => !addedIds.has(ex.id));
 
+  const reduceMotion = useReducedMotion();
+
   return (
     <div className="mb-8">
-      <Card variant="outline" className="relative mb-4 text-center">
-        <button
+      <Card
+        variant="outline"
+        className="relative mb-4 border-hairline/60 bg-canvas/70 text-center backdrop-blur-md"
+      >
+        <motion.button
           type="button"
           onClick={togglePause}
           aria-label={pausedAt ? "Resume workout" : "Pause workout"}
-          className="absolute left-4 top-4 flex size-9 items-center justify-center rounded-full bg-surface-card text-ink transition-colors active:scale-[0.98]"
+          whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+          transition={springDefault}
+          className="absolute left-4 top-4 flex size-9 items-center justify-center rounded-full bg-surface-card text-ink transition-colors"
         >
           {pausedAt ? <Play size={18} weight="bold" /> : <Pause size={18} weight="bold" />}
-        </button>
-        <button
+        </motion.button>
+        <motion.button
           type="button"
           onClick={() => setShowCancelConfirm(true)}
           aria-label="Cancel workout"
-          className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-error/10 text-error transition-colors active:scale-[0.98]"
+          whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+          transition={springDefault}
+          className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-error/10 text-error transition-colors"
         >
           <X size={18} weight="bold" />
-        </button>
+        </motion.button>
         <p className="font-display text-2xl font-semibold text-ink">{formatElapsed(elapsedSeconds)}</p>
         <p className="text-sm text-muted">
           {pausedAt
@@ -478,11 +495,13 @@ export function ActiveWorkout({
         <>
           <div className="mb-2 flex items-center justify-center gap-2 overflow-x-auto pb-1">
             {exercises.map((ex, i) => (
-              <button
+              <motion.button
                 key={ex.exerciseId}
                 type="button"
                 onClick={() => goToExercise(i)}
                 aria-label={`Jump to ${ex.name}`}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                transition={springDefault}
                 className={cn(
                   "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors",
                   i === currentIndex
@@ -493,16 +512,18 @@ export function ActiveWorkout({
                 )}
               >
                 {ex.finished ? <CheckCircle size={16} weight="fill" /> : i + 1}
-              </button>
+              </motion.button>
             ))}
-            <button
+            <motion.button
               type="button"
               onClick={() => setShowAddExercise(true)}
               aria-label="Add exercise"
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              transition={springDefault}
               className="flex size-9 shrink-0 items-center justify-center rounded-full border border-dashed border-hairline text-muted transition-colors hover:text-ink"
             >
               <Plus size={16} />
-            </button>
+            </motion.button>
           </div>
           <p className="mb-4 text-center text-xs text-muted">Tap any exercise to jump to it</p>
 
@@ -510,14 +531,16 @@ export function ActiveWorkout({
             <Card variant="outline" className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <p className="text-base font-semibold text-ink">{current.name}</p>
-                <button
+                <motion.button
                   type="button"
                   onClick={() => removeExercise(currentIndex)}
                   aria-label={`Remove ${current.name}`}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                  transition={springDefault}
                   className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-error"
                 >
                   <Trash size={16} />
-                </button>
+                </motion.button>
               </div>
               <p className="mb-4 text-xs text-muted">{current.finished ? "Finished" : "Current exercise"}</p>
 
@@ -653,14 +676,16 @@ export function ActiveWorkout({
             This discards everything logged in this session and can't be undone.
           </p>
           <div className="flex flex-col gap-2">
-            <button
+            <motion.button
               type="button"
               onClick={handleCancelWorkout}
               disabled={deleteSession.isPending}
-              className="flex h-10 w-full items-center justify-center rounded-md bg-error text-sm font-semibold text-white transition-colors active:scale-[0.98] disabled:opacity-50"
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              transition={springDefault}
+              className="flex h-10 w-full items-center justify-center rounded-md bg-error text-sm font-semibold text-white transition-colors disabled:opacity-50"
             >
               {deleteSession.isPending ? "Discarding…" : "Discard workout"}
-            </button>
+            </motion.button>
             <Button variant="secondary" className="w-full" onClick={() => setShowCancelConfirm(false)}>
               Keep going
             </Button>
