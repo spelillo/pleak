@@ -1,12 +1,22 @@
-import { useState } from "react";
-import { CaretDown, CaretUp, ClockCounterClockwise, WarningCircle } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
+import {
+  CaretDown,
+  CaretUp,
+  ClockCounterClockwise,
+  MagnifyingGlass,
+  Trophy,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
+import { PillTabs } from "@/components/ui/PillTabs";
 import { useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import { useAuth } from "@/contexts/auth-context";
 import { ApiError } from "@/lib/api";
+import { computePersonalRecords } from "@/lib/personalRecords";
 import type { WorkoutSession } from "@/lib/types";
 
 function formatDate(iso: string) {
@@ -71,11 +81,57 @@ function SessionCard({ session, isOpen, onToggle }: { session: WorkoutSession; i
   );
 }
 
+function PRList({ sessions }: { sessions: WorkoutSession[] }) {
+  const [query, setQuery] = useState("");
+  const records = useMemo(() => computePersonalRecords(sessions), [sessions]);
+  const filtered = records.filter((pr) => pr.exerciseName.toLowerCase().includes(query.trim().toLowerCase()));
+
+  return (
+    <div>
+      <div className="relative mb-4">
+        <MagnifyingGlass size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search exercises"
+          className="pl-9"
+          aria-label="Search exercises"
+        />
+      </div>
+
+      {records.length === 0 ? (
+        <EmptyState
+          icon={<Trophy size={22} />}
+          title="No PRs yet"
+          description="Complete a set with weight logged and it'll show up here."
+        />
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted">No exercises match "{query}".</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {filtered.map((pr) => (
+            <li key={pr.exerciseId}>
+              <Card variant="outline" className="flex items-center justify-between gap-3 py-4">
+                <p className="text-sm font-medium text-ink">{pr.exerciseName}</p>
+                <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-ink">
+                  <Trophy size={16} weight="fill" className="text-brand-gold" />
+                  {pr.weight} lb
+                </span>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function History() {
   const { user } = useAuth();
   const userId = user!.id;
   const { data: sessions, isLoading, isError, error } = useWorkoutSessions(userId);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"history" | "prs">("history");
 
   const completed = (sessions ?? [])
     .filter((s) => !s.isActive)
@@ -84,6 +140,16 @@ export function History() {
   return (
     <div>
       <PageHeader title="History" description="Every workout you've logged, in one place." />
+
+      <PillTabs
+        className="mb-6"
+        value={tab}
+        onChange={(v) => setTab(v as "history" | "prs")}
+        options={[
+          { value: "history", label: "History" },
+          { value: "prs", label: "PRs" },
+        ]}
+      />
 
       {isError && (
         <Card variant="outline" className="mb-6 flex items-start gap-3 border-error/30">
@@ -99,7 +165,7 @@ export function History() {
 
       {isLoading && <p className="text-sm text-muted">Loading…</p>}
 
-      {!isLoading && !isError && completed.length === 0 && (
+      {!isLoading && !isError && tab === "history" && completed.length === 0 && (
         <EmptyState
           icon={<ClockCounterClockwise size={22} />}
           title="No workouts logged yet"
@@ -107,7 +173,7 @@ export function History() {
         />
       )}
 
-      {!isLoading && !isError && completed.length > 0 && (
+      {!isLoading && !isError && tab === "history" && completed.length > 0 && (
         <div className="flex flex-col gap-3">
           {completed.map((session) => (
             <SessionCard
@@ -119,6 +185,8 @@ export function History() {
           ))}
         </div>
       )}
+
+      {!isLoading && !isError && tab === "prs" && <PRList sessions={sessions ?? []} />}
     </div>
   );
 }

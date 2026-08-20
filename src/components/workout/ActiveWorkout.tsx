@@ -13,6 +13,7 @@ import {
   Play,
   Plus,
   Trash,
+  Trophy,
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
@@ -22,9 +23,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { ExercisePicker } from "@/components/workout/ExercisePicker";
 import { useExercises } from "@/lib/queries/exercises";
-import { useDeleteWorkoutSession, useUpdateWorkoutSession } from "@/lib/queries/workoutSessions";
+import { useDeleteWorkoutSession, useUpdateWorkoutSession, useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import { useAuth } from "@/contexts/auth-context";
 import { REPS_INCREMENT, WEIGHT_INCREMENT, toWorkoutExercise } from "@/lib/workoutGeneration";
+import { getExercisePR } from "@/lib/personalRecords";
 import { cn } from "@/lib/cn";
 import type { WorkoutSummary } from "@/components/workout/WorkoutSummaryModal";
 import type { Exercise, WorkoutExercise, WorkoutSession, WorkoutSet } from "@/lib/types";
@@ -174,6 +176,7 @@ export function ActiveWorkout({
 }) {
   const { user } = useAuth();
   const { data: library } = useExercises();
+  const { data: pastSessions } = useWorkoutSessions(userId);
   const updateSession = useUpdateWorkoutSession(userId);
   const deleteSession = useDeleteWorkoutSession(userId);
   const [exercises, setExercises] = useState<WorkoutExercise[]>(session.exercises);
@@ -424,6 +427,16 @@ export function ActiveWorkout({
   const addedIds = new Set(exercises.map((ex) => ex.exerciseId));
   const availableToAdd = (library ?? []).filter((ex) => !addedIds.has(ex.id));
 
+  // Best of this exercise's PR from past sessions and any already-completed
+  // sets logged so far this session (which may not have synced back yet).
+  const currentPR = current
+    ? Math.max(
+        getExercisePR(current.exerciseId, (pastSessions ?? []).filter((s) => s.id !== session.id)) ?? -Infinity,
+        getExercisePR(current.exerciseId, [{ ...session, exercises }]) ?? -Infinity,
+      )
+    : -Infinity;
+  const hasPR = Number.isFinite(currentPR);
+
   const reduceMotion = useReducedMotion();
 
   return (
@@ -546,7 +559,15 @@ export function ActiveWorkout({
 
               {showEditor && currentSet && (
                 <div className="rounded-lg bg-surface-soft p-4">
-                  <p className="mb-3 text-sm font-semibold text-ink">Set {currentSetIndex + 1}</p>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-ink">Set {currentSetIndex + 1}</p>
+                    {!isCardio && hasPR && (
+                      <span className="flex items-center gap-1 text-xs font-medium text-muted">
+                        <Trophy size={14} weight="fill" className="text-brand-gold" />
+                        PR: {currentPR} lb
+                      </span>
+                    )}
+                  </div>
 
                   {isCardio ? (
                     <div className="grid grid-cols-2 gap-4">
