@@ -19,7 +19,14 @@ function listRows_(sheet, config, params) {
   var results = [];
   for (var i = 0; i < rows.length; i++) {
     if (isBlankRow_(rows[i])) continue;
-    var obj = rowToObject_(config, rows[i]);
+    var obj;
+    try {
+      obj = rowToObject_(config, rows[i]);
+    } catch (err) {
+      // A single malformed row (e.g. bad JSON in a json column) shouldn't
+      // take down the whole list — skip it and keep going.
+      continue;
+    }
     var matches = filterKeys.every(function (key) {
       return String(obj[key]) === String(params[key]);
     });
