@@ -63,10 +63,11 @@ it doesn't matter what order you add them in.
    - (This has to stay "Anyone" for an Apps Script Web App to be reachable
      from the browser at all. Signing in with Google verifies who's using
      the *app* — the frontend won't show any data until you've signed in
-     with an email in `ALLOWED_EMAILS` — but the `/exec` URL itself has no
-     per-request authorization yet: anyone who has the URL could call it
-     directly, bypassing the UI. Treat the URL as a shared secret for now,
-     the same as before this phase. See
+     with an email in `ALLOWED_EMAILS` — but Apps Script itself has no
+     per-request authorization. Step 6 below adds a shared-secret check so
+     the `/exec` URL isn't wide open to anyone who finds it, but it's still
+     not real per-user auth — see the comment on `isAuthorizedRequest_` in
+     `Router.gs` for the exact tradeoff. See also
      [google-signin-setup.md](google-signin-setup.md).)
 4. Click **Deploy**, authorize again if prompted.
 5. Copy the **Web app URL** it gives you (ends in `/exec`).
@@ -77,6 +78,27 @@ it doesn't matter what order you add them in.
 2. Set `VITE_API_BASE_URL` to the URL you copied.
 3. Restart `npm run dev` if it was already running (Vite only reads `.env*`
    files on startup).
+
+## 6. Set the API key
+
+Every request the frontend makes is checked against a shared secret
+(`isAuthorizedRequest_` in `Router.gs`) before anything else runs.
+
+1. Generate a random value, e.g. `openssl rand -hex 24` in a terminal.
+2. In the Apps Script editor, click the gear icon (**Project Settings**) in
+   the left sidebar.
+3. Scroll to **Script Properties** → **Add script property**.
+4. Property: `API_KEY`. Value: the random string from step 1. Click **Save
+   script properties**.
+5. Back in `pleak-app/`, set `VITE_API_KEY` in `.env.local` to the same
+   value.
+6. If you deploy via the GitHub Actions workflow, also add `VITE_API_KEY`
+   as a repository secret (**Settings → Secrets and variables → Actions →
+   New repository secret**) with the same value.
+
+The key never needs to change unless you suspect it's leaked — regenerating
+it just means updating the Script Property and every place `VITE_API_KEY`
+is set.
 
 ## Redeploying after script changes
 

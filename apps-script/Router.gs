@@ -9,6 +9,11 @@ function doPost(e) {
 function handleRequest_(e, method) {
   try {
     var params = (e && e.parameter) || {};
+
+    if (!isAuthorizedRequest_(params)) {
+      return respondJson_({ error: 'Unauthorized' });
+    }
+
     var resourceName = params.resource;
     var action = params.action || (method === 'GET' ? 'list' : null);
 
@@ -58,6 +63,20 @@ function handleRequest_(e, method) {
   } catch (err) {
     return respondJson_({ error: err && err.message ? err.message : String(err) });
   }
+}
+
+// The Web App has to be deployed with "Anyone" access to be reachable from
+// the browser at all — Apps Script has no per-request auth of its own, and
+// Google Sign-In only gates the UI, not this endpoint. This shared-secret
+// check is a deliberately modest bar: it keeps the endpoint from being
+// wide open to anyone who finds the URL (scanners, accidental discovery,
+// stale links), not a substitute for real per-user authorization. The key
+// is baked into the frontend bundle, so a determined reader of the built
+// JS can still recover it — that's an inherent limit of a static SPA with
+// no server of its own, not something this check can close.
+function isAuthorizedRequest_(params) {
+  var expected = PropertiesService.getScriptProperties().getProperty('API_KEY');
+  return !!expected && params.apiKey === expected;
 }
 
 function respondJson_(obj) {

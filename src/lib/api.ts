@@ -2,6 +2,15 @@ import type { ResourceName } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
+// Shared secret the Apps Script router checks on every request (see
+// isAuthorizedRequest_ in apps-script/Router.gs). This is a modest bar, not
+// real per-user auth — it's baked into the built JS bundle like any
+// client-embedded secret in a server-less static app, so treat it as a
+// deterrent against casual/automated hits on the URL, not a guarantee.
+// Exported so auth-api.ts (which makes its own request outside apiGet/
+// apiPost) can attach it too.
+export const API_KEY = import.meta.env.VITE_API_KEY as string | undefined;
+
 export class ApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -45,6 +54,7 @@ export async function apiGet<T>(
 ): Promise<T> {
   const url = new URL(requireBaseUrl());
   url.searchParams.set("resource", resource);
+  if (API_KEY) url.searchParams.set("apiKey", API_KEY);
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) url.searchParams.set(key, value);
   }
@@ -66,6 +76,7 @@ export async function apiPost<T>(
   const url = new URL(requireBaseUrl());
   url.searchParams.set("resource", resource);
   url.searchParams.set("action", action);
+  if (API_KEY) url.searchParams.set("apiKey", API_KEY);
   const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },

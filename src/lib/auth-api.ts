@@ -1,4 +1,4 @@
-import { ApiError } from "@/lib/api";
+import { API_KEY, ApiError } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
@@ -12,6 +12,7 @@ export async function loginWithGoogle(idToken: string): Promise<User> {
   const url = new URL(API_BASE_URL);
   url.searchParams.set("resource", "auth");
   url.searchParams.set("action", "login");
+  if (API_KEY) url.searchParams.set("apiKey", API_KEY);
   const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
