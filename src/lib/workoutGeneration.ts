@@ -48,7 +48,7 @@ export const WORKOUT_TYPES: WorkoutTypeOption[] = [
   { id: "pull", label: "Pull", description: "Back, biceps", movementType: "Pull" },
   { id: "legs", label: "Legs", description: "Quads, hamstrings, glutes", movementType: "Legs" },
   { id: "chest-back", label: "Chest/Back", description: "Upper body focus", targets: ["Chest", "Back"] },
-  { id: "arms", label: "Arms", description: "Biceps, triceps", targets: ["Arms"] },
+  { id: "arms", label: "Arms", description: "Biceps, triceps, shoulders", targets: ["Arms", "Shoulders"] },
 ];
 
 export function matchesWorkoutType(exercise: Exercise, type: WorkoutTypeOption): boolean {
