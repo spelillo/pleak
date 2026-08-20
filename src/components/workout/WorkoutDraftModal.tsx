@@ -96,7 +96,6 @@ export function WorkoutDraftModal({
   onRemoveExercise,
   onAddExercise,
   onStart,
-  isStarting,
 }: {
   type: WorkoutTypeOption;
   draft: WorkoutExercise[];
@@ -109,7 +108,6 @@ export function WorkoutDraftModal({
   onRemoveExercise: (index: number) => void;
   onAddExercise: (exercise: Exercise) => void;
   onStart: () => void;
-  isStarting: boolean;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const estimatedMinutes = estimateDurationMinutes(draft);
@@ -217,13 +215,8 @@ export function WorkoutDraftModal({
       </div>
 
       <div className="border-t border-hairline p-4">
-        <Button
-          variant="primary"
-          className="mb-2 w-full"
-          onClick={onStart}
-          disabled={draft.length === 0 || isStarting}
-        >
-          {isStarting ? "Starting…" : "Start workout"}
+        <Button variant="primary" className="mb-2 w-full" onClick={onStart} disabled={draft.length === 0}>
+          Start workout
         </Button>
         <Button variant="text" className="w-full justify-center" onClick={onBackToHome}>
           Back to home

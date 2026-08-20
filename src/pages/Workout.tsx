@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { Barbell, WarningCircle } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Toast } from "@/components/ui/Toast";
 import { ExerciseLibrary } from "@/components/workout/ExerciseLibrary";
 import { WorkoutStartModal } from "@/components/workout/WorkoutStartModal";
 import { ActiveWorkout } from "@/components/workout/ActiveWorkout";
@@ -16,11 +16,11 @@ import { ApiError } from "@/lib/api";
 export function Workout() {
   const { user } = useAuth();
   const userId = user!.id;
-  const [, setLocation] = useLocation();
   const { data: sessions, isLoading, isError, error } = useWorkoutSessions(userId);
   const activeSession = sessions?.find((s) => s.isActive);
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   return (
     <div>
@@ -43,7 +43,12 @@ export function Workout() {
       {!isLoading &&
         !isError &&
         (activeSession ? (
-          <ActiveWorkout session={activeSession} userId={userId} onFinished={setSummary} />
+          <ActiveWorkout
+            session={activeSession}
+            userId={userId}
+            onFinished={setSummary}
+            onSaveError={setToastMessage}
+          />
         ) : (
           <>
             <div className="mb-8">
@@ -68,19 +73,13 @@ export function Workout() {
           username={user!.displayName}
           onClose={() => setShowStartModal(false)}
           onStarted={() => setShowStartModal(false)}
+          onError={setToastMessage}
         />
       )}
 
-      {summary && (
-        <WorkoutSummaryModal
-          summary={summary}
-          onClose={() => setSummary(null)}
-          onViewHistory={() => {
-            setSummary(null);
-            setLocation("/history");
-          }}
-        />
-      )}
+      {summary && <WorkoutSummaryModal summary={summary} onClose={() => setSummary(null)} />}
+
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
 }

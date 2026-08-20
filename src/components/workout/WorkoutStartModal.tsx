@@ -13,11 +13,13 @@ export function WorkoutStartModal({
   username,
   onClose,
   onStarted,
+  onError,
 }: {
   userId: string;
   username: string;
   onClose: () => void;
   onStarted: () => void;
+  onError: (message: string) => void;
 }) {
   const { data: library, isLoading: isLibraryLoading } = useExercises();
   const startSession = useStartWorkoutSession(userId);
@@ -68,10 +70,14 @@ export function WorkoutStartModal({
 
   function handleStart() {
     if (!draft || draft.length === 0 || !selectedType) return;
+    // Optimistic: the session is written into the query cache synchronously
+    // by useStartWorkoutSession's onMutate, so we can jump straight into the
+    // workout instead of waiting on the Apps Script round trip.
     startSession.mutate(
-      { username, name: `${selectedType.label} Day`, exercises: draft },
-      { onSuccess: () => onStarted() },
+      { username, name: `${selectedType.label} Day`, exercises: draft, startTime: new Date().toISOString() },
+      { onError: () => onError("Couldn't start the workout — check your connection and try again.") },
     );
+    onStarted();
   }
 
   if (selectedType && draft) {
@@ -88,7 +94,6 @@ export function WorkoutStartModal({
         onRemoveExercise={handleRemoveExercise}
         onAddExercise={handleAddExercise}
         onStart={handleStart}
-        isStarting={startSession.isPending}
       />
     );
   }

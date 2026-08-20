@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Toast } from "@/components/ui/Toast";
 import { WorkoutStartModal } from "@/components/workout/WorkoutStartModal";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -12,6 +13,7 @@ export function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [showStartModal, setShowStartModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   return (
     <div>
@@ -49,8 +51,11 @@ export function Home() {
             setShowStartModal(false);
             setLocation("/workout");
           }}
+          onError={setToastMessage}
         />
       )}
+
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
 }

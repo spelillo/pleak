@@ -169,10 +169,12 @@ export function ActiveWorkout({
   session,
   userId,
   onFinished,
+  onSaveError,
 }: {
   session: WorkoutSession;
   userId: string;
   onFinished: (summary: WorkoutSummary) => void;
+  onSaveError: (message: string) => void;
 }) {
   const { user } = useAuth();
   const { data: library } = useExercises();
@@ -212,7 +214,10 @@ export function ActiveWorkout({
       return;
     }
     const timeout = setTimeout(() => {
-      updateSession.mutate({ id: session.id, exercises });
+      updateSession.mutate(
+        { id: session.id, exercises },
+        { onError: () => onSaveError("Couldn't save your progress — check your connection.") },
+      );
     }, 600);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -363,6 +368,9 @@ export function ActiveWorkout({
     setCurrentSetIndex(nextIndex);
   }
 
+  // Shows the summary card immediately — every value it needs is already
+  // known locally — and saves in the background rather than making the
+  // user wait on the backend to see their own workout recap.
   function saveAndFinish(exercisesToSave: WorkoutExercise[]) {
     const endTime = new Date();
     const totalDurationSec = Math.max(
@@ -370,15 +378,9 @@ export function ActiveWorkout({
       Math.round((endTime.getTime() - new Date(session.startTime).getTime() - totalPausedMs) / 1000),
     );
     const durationMins = Math.max(1, Math.round(totalDurationSec / 60));
-    const finishedCount = exercisesToSave.filter((ex) => ex.finished).length;
-    const completedSetsCount = exercisesToSave.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
-    const totalSetsCount = exercisesToSave.reduce((sum, ex) => sum + ex.sets.length, 0);
-    const totalVolume = exercisesToSave.reduce(
-      (sum, ex) =>
-        sum +
-        ex.sets.reduce((s, set) => s + (set.completed && set.weight && set.reps ? set.weight * set.reps : 0), 0),
-      0,
-    );
+
+    onFinished({ name: session.name, durationMins, exercises: exercisesToSave });
+
     updateSession.mutate(
       {
         id: session.id,
@@ -388,19 +390,7 @@ export function ActiveWorkout({
         totalDuration: totalDurationSec,
         durationMins,
       },
-      {
-        onSuccess: () => {
-          onFinished({
-            name: session.name,
-            durationMins,
-            exercisesFinished: finishedCount,
-            totalExercises: exercisesToSave.length,
-            setsCompleted: completedSetsCount,
-            totalSets: totalSetsCount,
-            totalVolume,
-          });
-        },
-      },
+      { onError: () => onSaveError("Couldn't save this workout — check your connection and try again.") },
     );
   }
 
@@ -417,7 +407,9 @@ export function ActiveWorkout({
   }
 
   function handleCancelWorkout() {
-    deleteSession.mutate(session.id);
+    deleteSession.mutate(session.id, {
+      onError: () => onSaveError("Couldn't discard the workout — check your connection and try again."),
+    });
   }
 
   const current = exercises[currentIndex];
