@@ -8,7 +8,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Home } from "@/pages/Home";
 import { Workout } from "@/pages/Workout";
 import { History } from "@/pages/History";
-import { Goals } from "@/pages/Goals";
+// import { Goals } from "@/pages/Goals"; // hidden for now — re-enable when it's ready
 import { Profile } from "@/pages/Profile";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -50,7 +50,7 @@ function App() {
                   <Route path="/" component={Home} />
                   <Route path="/workout" component={Workout} />
                   <Route path="/history" component={History} />
-                  <Route path="/goals" component={Goals} />
+                  {/* <Route path="/goals" component={Goals} /> hidden for now — re-enable when it's ready */}
                   <Route path="/profile" component={Profile} />
                   <Route>
                     <p className="text-sm text-muted">Page not found.</p>
