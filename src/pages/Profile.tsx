@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FocusEvent } from "react";
 import { Sun, Moon, Desktop, SignOut } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -6,8 +6,12 @@ import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { WeeklyActivityChart } from "@/components/profile/WeeklyActivityChart";
 import { useTheme } from "@/contexts/theme-context";
 import { useAuth } from "@/contexts/auth-context";
+import { useWorkoutSessions } from "@/lib/queries/workoutSessions";
+import { formatDuration, minutesByDayThisWeek, totalVolume } from "@/lib/workoutStats";
+import { addDays, startOfWeek } from "@/lib/weekPlanning";
 import { cn } from "@/lib/cn";
 
 const themeOptions = [
@@ -21,6 +25,19 @@ export function Profile() {
   const { user, signOut, updateProfile } = useAuth();
   const [weightInput, setWeightInput] = useState(() => user?.weight?.toString() ?? "");
   const [isSavingWeight, setIsSavingWeight] = useState(false);
+
+  const { data: sessions } = useWorkoutSessions(user?.id);
+  const weekStart = useMemo(() => startOfWeek(new Date()), []);
+  const stats = useMemo(() => {
+    const all = sessions ?? [];
+    const minutesByDay = minutesByDayThisWeek(all, weekStart);
+    return {
+      minutesByDay,
+      minutesThisWeek: minutesByDay.reduce((sum, m) => sum + m, 0),
+      volumeThisWeek: totalVolume(all, { start: weekStart, end: addDays(weekStart, 7) }),
+      volumeLifetime: totalVolume(all),
+    };
+  }, [sessions, weekStart]);
 
   function handleWeightBlur(e: FocusEvent<HTMLInputElement>) {
     const value = e.target.value.trim();
@@ -63,6 +80,27 @@ export function Profile() {
             <span className="text-sm text-muted">lb{isSavingWeight && " · Saving…"}</span>
           </div>
         </label>
+      </Card>
+
+      <h2 className="mb-3 text-sm font-semibold text-ink">This week</h2>
+      <Card variant="outline" className="mb-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted">Time working out</p>
+            <p className="text-lg font-semibold text-ink">{formatDuration(stats.minutesThisWeek)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-muted">Volume</p>
+            <p className="text-lg font-semibold text-ink">{stats.volumeThisWeek.toLocaleString()} lb</p>
+          </div>
+        </div>
+        <WeeklyActivityChart minutesByDay={stats.minutesByDay} />
+      </Card>
+
+      <h2 className="mb-3 text-sm font-semibold text-ink">Lifetime</h2>
+      <Card variant="outline" className="mb-6">
+        <p className="text-xs text-muted">Total volume</p>
+        <p className="text-2xl font-semibold text-ink">{stats.volumeLifetime.toLocaleString()} lb</p>
       </Card>
 
       <h2 className="mb-3 text-sm font-semibold text-ink">Appearance</h2>
