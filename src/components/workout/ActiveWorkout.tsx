@@ -7,6 +7,8 @@ import {
   CaretUp,
   CheckCircle,
   Minus,
+  Pause,
+  Play,
   Plus,
   Trash,
   X,
@@ -18,7 +20,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
 import { ExercisePicker } from "@/components/workout/ExercisePicker";
 import { useExercises } from "@/lib/queries/exercises";
-import { useUpdateWorkoutSession } from "@/lib/queries/workoutSessions";
+import { useDeleteWorkoutSession, useUpdateWorkoutSession } from "@/lib/queries/workoutSessions";
 import { useAuth } from "@/contexts/auth-context";
 import { REPS_INCREMENT, WEIGHT_INCREMENT, toWorkoutExercise } from "@/lib/workoutGeneration";
 import { cn } from "@/lib/cn";
@@ -165,14 +167,22 @@ export function ActiveWorkout({
   const { user } = useAuth();
   const { data: library } = useExercises();
   const updateSession = useUpdateWorkoutSession(userId);
+  const deleteSession = useDeleteWorkoutSession(userId);
   const [exercises, setExercises] = useState<WorkoutExercise[]>(session.exercises);
   const [currentIndex, setCurrentIndex] = useState(() => firstUnfinishedExerciseIndex(session.exercises));
   const [currentSetIndex, setCurrentSetIndex] = useState(() =>
     firstIncompleteSetIndex(session.exercises[firstUnfinishedExerciseIndex(session.exercises)]?.sets ?? []),
   );
   const [showFinishWorkoutWarning, setShowFinishWorkoutWarning] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // Pause freezes the displayed/saved elapsed time without touching set
+  // data. pausedAt is the timestamp pausing began (null while running);
+  // totalPausedMs accumulates every past pause so resuming keeps counting
+  // from where it left off instead of losing the paused interval.
+  const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const [totalPausedMs, setTotalPausedMs] = useState(0);
   const isFirstRender = useRef(true);
   const prevLengthRef = useRef(exercises.length);
 
@@ -181,6 +191,8 @@ export function ActiveWorkout({
     setExercises(session.exercises);
     setCurrentIndex(initialIndex);
     setCurrentSetIndex(firstIncompleteSetIndex(session.exercises[initialIndex]?.sets ?? []));
+    setPausedAt(null);
+    setTotalPausedMs(0);
   }, [session.id]);
 
   useEffect(() => {
@@ -196,9 +208,10 @@ export function ActiveWorkout({
   }, [exercises]);
 
   useEffect(() => {
+    if (pausedAt) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [pausedAt]);
 
   useEffect(() => {
     if (exercises.length !== prevLengthRef.current) {
@@ -210,11 +223,23 @@ export function ActiveWorkout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercises]);
 
-  const elapsedSeconds = Math.max(0, Math.round((now - new Date(session.startTime).getTime()) / 1000));
+  const elapsedSeconds = Math.max(
+    0,
+    Math.round(((pausedAt ?? now) - new Date(session.startTime).getTime() - totalPausedMs) / 1000),
+  );
   const exercisesFinished = exercises.filter((ex) => ex.finished).length;
-  const setsCompleted = exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
-  const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
   const bodyweight = user?.weight;
+  const isLastExercise = currentIndex === exercises.length - 1;
+
+  function togglePause() {
+    if (pausedAt) {
+      setTotalPausedMs((ms) => ms + (Date.now() - pausedAt));
+      setPausedAt(null);
+    } else {
+      setPausedAt(Date.now());
+      setNow(Date.now());
+    }
+  }
 
   // Navigating to an exercise whose sets are all already complete opens a
   // fresh set (carried-over weight/reps) rather than a read-only view —
@@ -327,11 +352,17 @@ export function ActiveWorkout({
     setCurrentSetIndex(nextIndex);
   }
 
-  function doFinishWorkout() {
+  function saveAndFinish(exercisesToSave: WorkoutExercise[]) {
     const endTime = new Date();
-    const totalDurationSec = Math.round((endTime.getTime() - new Date(session.startTime).getTime()) / 1000);
+    const totalDurationSec = Math.max(
+      0,
+      Math.round((endTime.getTime() - new Date(session.startTime).getTime() - totalPausedMs) / 1000),
+    );
     const durationMins = Math.max(1, Math.round(totalDurationSec / 60));
-    const totalVolume = exercises.reduce(
+    const finishedCount = exercisesToSave.filter((ex) => ex.finished).length;
+    const completedSetsCount = exercisesToSave.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
+    const totalSetsCount = exercisesToSave.reduce((sum, ex) => sum + ex.sets.length, 0);
+    const totalVolume = exercisesToSave.reduce(
       (sum, ex) =>
         sum +
         ex.sets.reduce((s, set) => s + (set.completed && set.weight && set.reps ? set.weight * set.reps : 0), 0),
@@ -340,7 +371,7 @@ export function ActiveWorkout({
     updateSession.mutate(
       {
         id: session.id,
-        exercises,
+        exercises: exercisesToSave,
         isActive: false,
         endTime: endTime.toISOString(),
         totalDuration: totalDurationSec,
@@ -351,10 +382,10 @@ export function ActiveWorkout({
           onFinished({
             name: session.name,
             durationMins,
-            exercisesFinished,
-            totalExercises: exercises.length,
-            setsCompleted,
-            totalSets,
+            exercisesFinished: finishedCount,
+            totalExercises: exercisesToSave.length,
+            setsCompleted: completedSetsCount,
+            totalSets: totalSetsCount,
             totalVolume,
           });
         },
@@ -363,12 +394,19 @@ export function ActiveWorkout({
   }
 
   function handleFinishWorkout() {
-    if (exercisesFinished < exercises.length && !showFinishWorkoutWarning) {
+    const updated = exercises.map((ex, i) => (i === currentIndex ? { ...ex, finished: true } : ex));
+    setExercises(updated);
+    const unfinishedCount = updated.filter((ex) => !ex.finished).length;
+    if (unfinishedCount > 0 && !showFinishWorkoutWarning) {
       setShowFinishWorkoutWarning(true);
       return;
     }
     setShowFinishWorkoutWarning(false);
-    doFinishWorkout();
+    saveAndFinish(updated);
+  }
+
+  function handleCancelWorkout() {
+    deleteSession.mutate(session.id);
   }
 
   const current = exercises[currentIndex];
@@ -383,15 +421,27 @@ export function ActiveWorkout({
       <Card variant="outline" className="relative mb-4 text-center">
         <button
           type="button"
-          onClick={handleFinishWorkout}
-          aria-label="Finish workout"
+          onClick={togglePause}
+          aria-label={pausedAt ? "Resume workout" : "Pause workout"}
+          className="absolute left-4 top-4 flex size-9 items-center justify-center rounded-full bg-surface-card text-ink transition-colors active:scale-[0.98]"
+        >
+          {pausedAt ? <Play size={18} weight="bold" /> : <Pause size={18} weight="bold" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowCancelConfirm(true)}
+          aria-label="Cancel workout"
           className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-error/10 text-error transition-colors active:scale-[0.98]"
         >
           <X size={18} weight="bold" />
         </button>
         <p className="font-display text-2xl font-semibold text-ink">{formatElapsed(elapsedSeconds)}</p>
         <p className="text-sm text-muted">
-          {exercises.length > 0 ? `Exercise ${currentIndex + 1} of ${exercises.length}` : session.name}
+          {pausedAt
+            ? "Paused"
+            : exercises.length > 0
+              ? `Exercise ${currentIndex + 1} of ${exercises.length}`
+              : session.name}
         </p>
 
         {showFinishWorkoutWarning && (
@@ -564,10 +614,17 @@ export function ActiveWorkout({
               <CaretLeft size={16} weight="bold" />
               Previous
             </Button>
-            <Button variant="primary" className="flex-1" onClick={handleNextExercise}>
-              Next Exercise
-              <CaretRight size={16} weight="bold" />
-            </Button>
+            {isLastExercise ? (
+              <Button variant="primary" className="flex-1" onClick={handleFinishWorkout}>
+                <CheckCircle size={16} weight="bold" />
+                Finish Workout
+              </Button>
+            ) : (
+              <Button variant="primary" className="flex-1" onClick={handleNextExercise}>
+                Next Exercise
+                <CaretRight size={16} weight="bold" />
+              </Button>
+            )}
           </div>
         </>
       )}
@@ -586,6 +643,28 @@ export function ActiveWorkout({
             </button>
           </div>
           <ExercisePicker exercises={availableToAdd} onSelect={addExerciseToWorkout} />
+        </Modal>
+      )}
+
+      {showCancelConfirm && (
+        <Modal onClose={() => setShowCancelConfirm(false)} ariaLabel="Cancel workout" className="max-w-sm p-6">
+          <h3 className="mb-2 text-lg font-semibold text-ink">Cancel this workout?</h3>
+          <p className="mb-5 text-sm text-muted">
+            This discards everything logged in this session and can't be undone.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleCancelWorkout}
+              disabled={deleteSession.isPending}
+              className="flex h-10 w-full items-center justify-center rounded-md bg-error text-sm font-semibold text-white transition-colors active:scale-[0.98] disabled:opacity-50"
+            >
+              {deleteSession.isPending ? "Discarding…" : "Discard workout"}
+            </button>
+            <Button variant="secondary" className="w-full" onClick={() => setShowCancelConfirm(false)}>
+              Keep going
+            </Button>
+          </div>
         </Modal>
       )}
     </div>

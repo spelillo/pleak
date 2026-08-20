@@ -42,3 +42,13 @@ export function useUpdateWorkoutSession(userId: string) {
     },
   });
 }
+
+export function useDeleteWorkoutSession(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiPost<{ success: boolean }>("workoutSessions", "delete", { id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sessionsKey(userId) });
+    },
+  });
+}
