@@ -219,8 +219,6 @@ function seedExercises() {
           exerciseType: 'weights',
           muscleGroups: exercise.muscleGroups,
           movementType: category === 'weightlifting' ? MUSCLE_GROUP_MOVEMENT_TYPE[exercise.muscleGroups[0]] || '' : '',
-          instructions: 'Perform ' + exercise.name + ' with proper form and control.',
-          equipment: 'Varies',
           userId: null,
           createdAt: now,
         }),

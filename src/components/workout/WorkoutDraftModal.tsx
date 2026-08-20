@@ -35,12 +35,6 @@ function DraftExerciseCard({
           {libraryExercise && libraryExercise.muscleGroups.length > 0 && (
             <p className="mt-0.5 text-xs text-muted">{libraryExercise.muscleGroups.join(", ")}</p>
           )}
-          {libraryExercise?.instructions && (
-            <p className="mt-1 text-xs text-muted">{libraryExercise.instructions}</p>
-          )}
-          {libraryExercise?.equipment && (
-            <p className="mt-0.5 text-xs text-muted">Equipment: {libraryExercise.equipment}</p>
-          )}
         </div>
         <div className="flex shrink-0 gap-1">
           <button
