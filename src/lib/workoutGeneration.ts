@@ -38,17 +38,51 @@ export interface WorkoutTypeOption {
   description: string;
   movementType?: MovementType;
   targets?: PrimaryTarget[];
+  // Minimum number of exercises to draw from each fine-grained muscle group,
+  // enforced by generateDraftExercises before the remaining slots are filled
+  // with a shuffled mix of anything else matching the split.
+  muscleRequirements?: Record<string, number>;
 }
 
 // The five workout types offered on the setup screen. Push/Pull/Legs match
 // on the exercise's movementType tag; the muscle-group splits match on any
 // of their listed primary targets.
 export const WORKOUT_TYPES: WorkoutTypeOption[] = [
-  { id: "push", label: "Push", description: "Chest, shoulders, triceps", movementType: "Push" },
-  { id: "pull", label: "Pull", description: "Back, biceps", movementType: "Pull" },
-  { id: "legs", label: "Legs", description: "Quads, hamstrings, glutes", movementType: "Legs" },
-  { id: "chest-back", label: "Chest/Back", description: "Upper body focus", targets: ["Chest", "Back"] },
-  { id: "arms", label: "Arms", description: "Biceps, triceps, shoulders", targets: ["Arms", "Shoulders"] },
+  {
+    id: "push",
+    label: "Push",
+    description: "Chest, shoulders, triceps",
+    movementType: "Push",
+    muscleRequirements: { Chest: 1, Triceps: 1, Shoulders: 1 },
+  },
+  {
+    id: "pull",
+    label: "Pull",
+    description: "Back, biceps",
+    movementType: "Pull",
+    muscleRequirements: { Back: 2, Biceps: 2 },
+  },
+  {
+    id: "legs",
+    label: "Legs",
+    description: "Quads, hamstrings, glutes",
+    movementType: "Legs",
+    muscleRequirements: { Quads: 2, Hamstrings: 2 },
+  },
+  {
+    id: "chest-back",
+    label: "Chest/Back",
+    description: "Upper body focus",
+    targets: ["Chest", "Back"],
+    muscleRequirements: { Chest: 2, Back: 2 },
+  },
+  {
+    id: "arms",
+    label: "Arms",
+    description: "Biceps, triceps, shoulders",
+    targets: ["Arms", "Shoulders"],
+    muscleRequirements: { Biceps: 1, Triceps: 1, Shoulders: 1 },
+  },
 ];
 
 export function matchesWorkoutType(exercise: Exercise, type: WorkoutTypeOption): boolean {
@@ -96,9 +130,31 @@ export function generateDraftExercises(
   count: number = DEFAULT_EXERCISE_COUNT,
 ): WorkoutExercise[] {
   const matching = pool.filter((ex) => matchesWorkoutType(ex, type));
-  return shuffle(matching)
-    .slice(0, count)
-    .map(toWorkoutExercise);
+  const requirements = type.muscleRequirements ?? {};
+  const requiredTotal = Object.values(requirements).reduce((sum, n) => sum + n, 0);
+  const targetCount = Math.max(count, requiredTotal);
+
+  const picked: Exercise[] = [];
+  const pickedIds = new Set<string>();
+
+  for (const [muscleGroup, minCount] of Object.entries(requirements)) {
+    const candidates = shuffle(matching.filter((ex) => ex.muscleGroups.includes(muscleGroup)));
+    for (const ex of candidates) {
+      if (picked.filter((p) => p.muscleGroups.includes(muscleGroup)).length >= minCount) break;
+      if (pickedIds.has(ex.id)) continue;
+      picked.push(ex);
+      pickedIds.add(ex.id);
+    }
+  }
+
+  const remaining = shuffle(matching.filter((ex) => !pickedIds.has(ex.id)));
+  for (const ex of remaining) {
+    if (picked.length >= targetCount) break;
+    picked.push(ex);
+    pickedIds.add(ex.id);
+  }
+
+  return shuffle(picked).map(toWorkoutExercise);
 }
 
 export function estimateDurationMinutes(exercises: WorkoutExercise[]): number {

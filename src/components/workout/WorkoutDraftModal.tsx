@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
-import { ExercisePicker } from "@/components/workout/ExercisePicker";
+import { ExercisePickerModal } from "@/components/workout/ExercisePickerModal";
 import { estimateDurationMinutes, toWorkoutExercise, type WorkoutTypeOption } from "@/lib/workoutGeneration";
 import type { Exercise, WorkoutExercise } from "@/lib/types";
 
@@ -12,19 +12,15 @@ function DraftExerciseCard({
   index,
   exercise,
   libraryExercise,
-  swapCandidates,
-  onSwap,
+  onSwapClick,
   onRemove,
 }: {
   index: number;
   exercise: WorkoutExercise;
   libraryExercise?: Exercise;
-  swapCandidates: Exercise[];
-  onSwap: (next: Exercise) => void;
+  onSwapClick: () => void;
   onRemove: () => void;
 }) {
-  const [isSwapping, setIsSwapping] = useState(false);
-
   return (
     <Card variant="outline">
       <div className="flex items-start justify-between gap-3">
@@ -39,14 +35,9 @@ function DraftExerciseCard({
         <div className="flex shrink-0 gap-1">
           <button
             type="button"
-            onClick={() => setIsSwapping((v) => !v)}
+            onClick={onSwapClick}
             aria-label={`Swap ${exercise.name}`}
-            aria-pressed={isSwapping}
-            className={
-              isSwapping
-                ? "flex size-8 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue"
-                : "flex size-8 items-center justify-center rounded-full text-muted hover:text-ink"
-            }
+            className="flex size-8 items-center justify-center rounded-full text-muted hover:text-ink"
           >
             <PencilSimple size={16} />
           </button>
@@ -60,20 +51,6 @@ function DraftExerciseCard({
           </button>
         </div>
       </div>
-
-      {isSwapping && (
-        <div className="mt-3 border-t border-hairline pt-3">
-          <ExercisePicker
-            exercises={swapCandidates}
-            onSelect={(next) => {
-              onSwap(next);
-              setIsSwapping(false);
-            }}
-            placeholder="Search a replacement…"
-            autoFocus
-          />
-        </div>
-      )}
     </Card>
   );
 }
@@ -104,11 +81,13 @@ export function WorkoutDraftModal({
   onStart: () => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const estimatedMinutes = estimateDurationMinutes(draft);
   const draftIds = new Set(draft.map((ex) => ex.exerciseId));
   const availableToAdd = library.filter((ex) => !draftIds.has(ex.id));
 
   return (
+    <>
     <Modal onClose={onClose} ariaLabel={`${type.label} workout preview`} className="max-w-lg">
       <div className="flex items-center justify-between border-b border-hairline p-4">
         <div className="flex min-w-0 items-center gap-2">
@@ -179,8 +158,7 @@ export function WorkoutDraftModal({
                 index={index}
                 exercise={exercise}
                 libraryExercise={library.find((ex) => ex.id === exercise.exerciseId)}
-                swapCandidates={availableToAdd}
-                onSwap={(next) => onUpdateExercise(index, toWorkoutExercise(next))}
+                onSwapClick={() => setSwapIndex(index)}
                 onRemove={() => onRemoveExercise(index)}
               />
             ))}
@@ -196,16 +174,6 @@ export function WorkoutDraftModal({
           Add exercise
         </button>
 
-        {showPicker && (
-          <div className="mt-3">
-            <ExercisePicker
-              exercises={availableToAdd}
-              onSelect={(ex) => onAddExercise(ex)}
-              placeholder="Search exercises to add…"
-              autoFocus
-            />
-          </div>
-        )}
       </div>
 
       <div className="border-t border-hairline p-4">
@@ -217,5 +185,30 @@ export function WorkoutDraftModal({
         </Button>
       </div>
     </Modal>
+
+    {showPicker && (
+      <ExercisePickerModal
+        exercises={availableToAdd}
+        title="Add exercise"
+        onSelect={(ex) => {
+          onAddExercise(ex);
+          setShowPicker(false);
+        }}
+        onClose={() => setShowPicker(false)}
+      />
+    )}
+
+    {swapIndex !== null && (
+      <ExercisePickerModal
+        exercises={availableToAdd}
+        title={`Swap ${draft[swapIndex]?.name ?? "exercise"}`}
+        onSelect={(next) => {
+          onUpdateExercise(swapIndex, toWorkoutExercise(next));
+          setSwapIndex(null);
+        }}
+        onClose={() => setSwapIndex(null)}
+      />
+    )}
+    </>
   );
 }
