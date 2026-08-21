@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import type { FormEvent } from "react";
 import { Barbell, MagnifyingGlass, Plus, WarningCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -7,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PillTabs } from "@/components/ui/PillTabs";
+import { CreateExerciseModal } from "@/components/workout/CreateExerciseModal";
 import { useExercises, useCreateExercise } from "@/lib/queries/exercises";
 import { ApiError } from "@/lib/api";
 import { categoryLabel } from "@/lib/exerciseLabels";
@@ -21,24 +21,9 @@ function matchesQuery(exercise: Exercise, query: string) {
 export function ExerciseLibrary() {
   const { data: exercises, isLoading, isError, error } = useExercises();
   const createExercise = useCreateExercise();
-  const [name, setName] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
-
-  function handleAdd(e: FormEvent) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    createExercise.mutate(
-      {
-        name: trimmed,
-        category: "weightlifting",
-        exerciseType: "weights",
-        muscleGroups: [],
-      },
-      { onSuccess: () => setName("") },
-    );
-  }
+  const [showCreate, setShowCreate] = useState(false);
 
   const categoryOptions = useMemo(() => {
     const set = new Set((exercises ?? []).map((ex) => ex.category));
@@ -61,17 +46,10 @@ export function ExerciseLibrary() {
         )}
       </div>
 
-      <form onSubmit={handleAdd} className="mb-4 flex gap-2">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Add an exercise, e.g. Barbell Squat"
-        />
-        <Button type="submit" disabled={createExercise.isPending || !name.trim()}>
-          <Plus size={16} weight="bold" />
-          Add
-        </Button>
-      </form>
+      <Button className="mb-4 w-full justify-center" onClick={() => setShowCreate(true)}>
+        <Plus size={16} weight="bold" />
+        Add exercise
+      </Button>
 
       {isError && (
         <Card variant="outline" className="mb-4 flex items-start gap-3 border-error/30">
@@ -129,6 +107,7 @@ export function ExerciseLibrary() {
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1.5">
+                    {exercise.userId && <Badge tone="purple">Custom</Badge>}
                     {exercise.movementType && <Badge tone="gold">{exercise.movementType}</Badge>}
                     <Badge tone="blue">{categoryLabel(exercise.category)}</Badge>
                   </div>
@@ -137,6 +116,17 @@ export function ExerciseLibrary() {
             </ul>
           )}
         </>
+      )}
+
+      {showCreate && (
+        <CreateExerciseModal
+          exercises={exercises ?? []}
+          isSaving={createExercise.isPending}
+          onCreate={(input) => {
+            createExercise.mutate(input, { onSuccess: () => setShowCreate(false) });
+          }}
+          onClose={() => setShowCreate(false)}
+        />
       )}
     </div>
   );

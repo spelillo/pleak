@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { MagnifyingGlass } from "@phosphor-icons/react";
+import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
@@ -142,7 +143,10 @@ export function ExercisePickerModal({ exercises, onSelect, onClose, title }: Exe
                   onClick={() => onSelect(ex)}
                   className="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-surface-soft"
                 >
-                  <span className="text-sm font-medium text-ink">{ex.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-ink">{ex.name}</span>
+                    {ex.userId && <Badge tone="purple">Custom</Badge>}
+                  </span>
                   {ex.muscleGroups.length > 0 && (
                     <span className="text-xs text-muted">{ex.muscleGroups.join(", ")}</span>
                   )}
