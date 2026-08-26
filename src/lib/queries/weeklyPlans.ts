@@ -64,7 +64,7 @@ export function useSaveWeeklyPlanDay(weeklyPlanId: string, weekStartDate: string
           }),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: daysKey(weeklyPlanId, weekStartDate) });
-      const optimisticId = input.id ?? `optimistic-${Date.now()}`;
+      const optimisticId = input.id ?? `optimistic-${crypto.randomUUID()}`;
       const optimisticDay: WeeklyPlanDay = {
         id: optimisticId,
         weeklyPlanId,

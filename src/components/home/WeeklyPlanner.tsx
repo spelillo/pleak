@@ -23,11 +23,16 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
   const weekStartKey = toDateKey(weekStart);
   const isCurrentWeek = isSameDay(weekStart, startOfWeek(today));
 
-  const { data: plans } = useWeeklyWorkoutPlans(userId);
+  const { data: plans, isPending: isPlansPending } = useWeeklyWorkoutPlans(userId);
   const activePlan = plans?.find((p) => p.isActive);
   const createPlan = useCreateWeeklyWorkoutPlan(userId);
 
-  const { data: days } = useWeeklyPlanDays(activePlan?.id, weekStartKey);
+  const { data: days, isPending: isDaysPending } = useWeeklyPlanDays(activePlan?.id, weekStartKey);
+  // Days can't even start fetching until the plans query resolves and hands
+  // over activePlan.id (see the `enabled` gate in useWeeklyPlanDays), so
+  // isDaysPending alone would read true forever when there's no plan yet.
+  // Only treat "days" as still loading while a plan is actually in flight.
+  const isLoading = isPlansPending || (!!activePlan && isDaysPending);
   const daysByIndex = new Map((days ?? []).map((d) => [d.dayOfWeek, d]));
 
   const [activeDay, setActiveDay] = useState<{ dayOfWeek: number; date: Date; existing: WeeklyPlanDay | null } | null>(
@@ -101,10 +106,11 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
               type="button"
               onClick={() => handleDayClick(i, date)}
               aria-label={`${planned ? "Edit" : "Plan"} ${FULL_DAY_LABELS[i]}`}
+              disabled={isLoading}
               whileTap={reduceMotion ? undefined : { scale: 0.96 }}
               transition={springDefault}
               className={cn(
-                "flex flex-col items-center gap-2 rounded-lg border px-1 py-3 transition-colors",
+                "flex flex-col items-center gap-2 rounded-lg border px-1 py-3 transition-colors disabled:opacity-60",
                 isToday ? "border-brand-blue bg-brand-blue/5" : "border-hairline",
               )}
             >
@@ -112,6 +118,8 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
               <span className="text-base font-semibold text-ink">{date.getDate()}</span>
               {bootstrappingDay === i ? (
                 <CircleNotch size={18} className="animate-spin text-muted" />
+              ) : isLoading ? (
+                <CircleNotch size={18} className="animate-spin text-muted/50" />
               ) : planned ? (
                 <CheckCircle size={18} weight="fill" className="text-brand-blue" />
               ) : (
@@ -125,7 +133,9 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
       {isCurrentWeek && (
         <div className="mt-4 rounded-lg bg-surface-soft p-4">
           <p className="text-sm font-semibold text-ink">Today: {FULL_DAY_LABELS[today.getDay()]}</p>
-          <p className="text-sm text-muted">{todayEntry ? todayEntry.title || "Workout planned" : "No workout planned"}</p>
+          <p className="text-sm text-muted">
+            {isLoading ? "Loading…" : todayEntry ? todayEntry.title || "Workout planned" : "No workout planned"}
+          </p>
         </div>
       )}
 

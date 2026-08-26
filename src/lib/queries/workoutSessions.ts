@@ -33,7 +33,7 @@ export function useStartWorkoutSession(userId: string) {
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: sessionsKey(userId) });
       const previous = queryClient.getQueryData<WorkoutSession[]>(sessionsKey(userId));
-      const optimisticId = `optimistic-${Date.now()}`;
+      const optimisticId = `optimistic-${crypto.randomUUID()}`;
       const optimisticSession: WorkoutSession = {
         id: optimisticId,
         userId,

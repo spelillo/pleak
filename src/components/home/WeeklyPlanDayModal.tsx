@@ -10,7 +10,7 @@ import { springDefault } from "@/lib/motion";
 import { ExercisePicker } from "@/components/workout/ExercisePicker";
 import { useExercises } from "@/lib/queries/exercises";
 import { useSaveWeeklyPlanDay, useDeleteWeeklyPlanDay } from "@/lib/queries/weeklyPlans";
-import { useStartWorkoutSession } from "@/lib/queries/workoutSessions";
+import { useStartWorkoutSession, useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import { generateDraftExercises, toWorkoutExercise, WORKOUT_TYPES, type WorkoutTypeOption } from "@/lib/workoutGeneration";
 import type { WeeklyPlanDay, WorkoutExercise } from "@/lib/types";
 
@@ -43,6 +43,8 @@ export function WeeklyPlanDayModal({
   const saveDay = useSaveWeeklyPlanDay(weeklyPlanId, weekStartDate);
   const deleteDay = useDeleteWeeklyPlanDay(weeklyPlanId, weekStartDate);
   const startSession = useStartWorkoutSession(userId);
+  const { data: sessions } = useWorkoutSessions(userId);
+  const hasActiveSession = sessions?.some((s) => s.isActive) ?? false;
   const reduceMotion = useReducedMotion();
 
   const [step, setStep] = useState<Step>(existing ? "curate" : "type");
@@ -98,14 +100,22 @@ export function WeeklyPlanDayModal({
     onClose();
   }
 
-  function handleStartNow() {
+  async function handleStartNow() {
     if (draft.length === 0) return;
+    if (hasActiveSession) {
+      onError("You already have a workout in progress — finish or discard it before starting another.");
+      return;
+    }
     // Persist whatever's been curated so the plan reflects what's actually
-    // being done, not just whatever was last explicitly "saved".
-    saveDay.mutate(
-      { id: existing?.id, dayOfWeek, title: title || "Workout", exercises: draft },
-      { onError: () => onError("Couldn't save your plan — check your connection.") },
-    );
+    // being done, not just whatever was last explicitly "saved". Awaited so
+    // a failed save doesn't leave a workout session started from exercises
+    // that never made it into the plan.
+    try {
+      await saveDay.mutateAsync({ id: existing?.id, dayOfWeek, title: title || "Workout", exercises: draft });
+    } catch {
+      onError("Couldn't save your plan — check your connection.");
+      return;
+    }
     startSession.mutate(
       { username, name: title || "Workout", exercises: draft, startTime: new Date().toISOString() },
       { onError: () => onError("Couldn't start the workout — check your connection and try again.") },
@@ -261,8 +271,13 @@ export function WeeklyPlanDayModal({
             Save to plan
           </Button>
           {draft.length > 0 && (
-            <Button variant="secondary" className="w-full" onClick={handleStartNow}>
-              Start workout now
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={handleStartNow}
+              disabled={hasActiveSession || startSession.isPending}
+            >
+              {hasActiveSession ? "Workout already in progress" : "Start workout now"}
             </Button>
           )}
           {existing && (
