@@ -11,6 +11,16 @@ export function useWorkoutSessions(userId: string | undefined) {
     queryKey: sessionsKey(userId ?? ""),
     queryFn: () => apiGet<WorkoutSession[]>("workoutSessions", { action: "list", userId }),
     enabled: !!userId,
+    // This cache is written to almost entirely via optimistic mutations
+    // (start/update/delete above all treat local state as authoritative —
+    // see their comments). An auto-refetch on window focus/reconnect races
+    // those writes: if it lands while a mutation's POST is still in flight
+    // (e.g. the app was backgrounded right after tapping Finish), it reads
+    // the backend's pre-write state and clobbers the optimistic update —
+    // an already-finished workout would reappear as active. Refetch only
+    // on an explicit mount/staleTime cycle, not on focus/reconnect.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 

@@ -34,6 +34,11 @@ export function useWeeklyPlanDays(weeklyPlanId: string | undefined, weekStartDat
     queryKey: daysKey(weeklyPlanId ?? "", weekStartDate),
     queryFn: () => apiGet<WeeklyPlanDay[]>("weeklyPlanDays", { action: "list", weeklyPlanId, weekStartDate }),
     enabled: !!weeklyPlanId,
+    // Same race as useWorkoutSessions (see its comment): saves here are
+    // optimistic with no reconciliation, so a background refetch racing an
+    // in-flight save can clobber it with pre-write data.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
