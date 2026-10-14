@@ -60,10 +60,11 @@ instead of Apps Script.
 URL(s), e.g. `https://pleak.vercel.app` and any custom domain. Keep
 `http://localhost:5173` for local dev. Redirect URIs stay empty.
 
-## 4. Set Vercel environment variables
+## 4. Vercel environment variables (optional)
 
-Vercel → the pleak project → **Settings** → **Environment Variables**, for
-Production and Preview:
+The app has Pleak's Supabase URL, publishable key and Google client ID built
+in (`src/lib/supabase.ts`, `src/contexts/auth-context.tsx`), so Vercel needs
+no variables. Set these only to point a deploy at a different project:
 
 | Name | Value |
 | --- | --- |
