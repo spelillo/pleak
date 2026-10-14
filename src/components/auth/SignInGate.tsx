@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { Card } from "@/components/ui/Card";
 
 export function SignInGate() {
-  const { isGoogleReady, isLoading, error, renderSignInButton } = useAuth();
+  const { isGoogleReady, isLoading, error, setupError, renderSignInButton } = useAuth();
   const buttonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,12 +27,13 @@ export function SignInGate() {
         </div>
 
         <div ref={buttonRef} />
+        {!isGoogleReady && !setupError && <p className="text-sm text-muted">Loading sign-in…</p>}
         {isLoading && <p className="text-sm text-muted">Signing in…</p>}
 
-        {error && (
+        {(setupError || error) && (
           <Card variant="outline" className="flex w-full items-start gap-3 border-error/30 text-left">
             <WarningCircle size={20} className="mt-0.5 shrink-0 text-error" />
-            <p className="text-sm text-muted">{error}</p>
+            <p className="text-sm text-muted">{setupError ?? error}</p>
           </Card>
         )}
       </div>

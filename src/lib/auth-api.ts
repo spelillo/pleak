@@ -18,7 +18,15 @@ function requireConfig() {
 export async function fetchAppUser(): Promise<User> {
   requireConfig();
   const { data, error } = await supabase.rpc("pleak_login");
-  if (error) throw new ApiError(error.message);
+  if (error) {
+    // PostgREST's "function/table not found" codes: the migration hasn't run.
+    if (["PGRST202", "PGRST205", "42P01", "42883"].includes(error.code)) {
+      throw new ApiError(
+        "The database isn't set up yet. Run supabase/migrations/20261014000000_initial_schema.sql in the Supabase SQL editor.",
+      );
+    }
+    throw new ApiError(error.message);
+  }
   return rowToRecord<User>(data as Record<string, unknown>);
 }
 
@@ -30,7 +38,12 @@ export async function fetchAppUser(): Promise<User> {
 export async function loginWithGoogle(idToken: string, nonce: string): Promise<User> {
   requireConfig();
   const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken, nonce });
-  if (error) throw new ApiError(error.message);
+  if (error) {
+    if (/provider.*(not enabled|unsupported)|unsupported provider/i.test(error.message)) {
+      throw new ApiError("Google sign-in isn't turned on in Supabase yet (Authentication → Providers → Google).");
+    }
+    throw new ApiError(error.message);
+  }
   try {
     return await fetchAppUser();
   } catch (err) {

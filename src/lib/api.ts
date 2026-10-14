@@ -90,19 +90,21 @@ export async function apiGet<T>(
 
 /**
  * create: inserts the payload and returns the stored row.
+ * upsert: inserts, or replaces the row with the same payload.id.
  * update: patches the row with payload.id and returns the merged row.
  * delete: removes the row with payload.id.
  */
 export async function apiPost<T>(
   resource: ResourceName,
-  action: "create" | "update" | "delete",
+  action: "create" | "upsert" | "update" | "delete",
   payload: Record<string, unknown>,
 ): Promise<T> {
   requireConfig();
   const table = supabase.from(TABLES[resource]);
 
-  if (action === "create") {
-    const { data, error } = await table.insert(recordToRow(payload)).select().single();
+  if (action === "create" || action === "upsert") {
+    const row = recordToRow(payload);
+    const { data, error } = await (action === "create" ? table.insert(row) : table.upsert(row)).select().single();
     if (error) fail(error);
     return rowToRecord<T>(data);
   }

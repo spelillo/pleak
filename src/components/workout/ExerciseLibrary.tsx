@@ -122,10 +122,14 @@ export function ExerciseLibrary() {
         <CreateExerciseModal
           exercises={exercises ?? []}
           isSaving={createExercise.isPending}
+          error={createExercise.error ? "Couldn't save the exercise. Check your connection and try again." : null}
           onCreate={(input) => {
             createExercise.mutate(input, { onSuccess: () => setShowCreate(false) });
           }}
-          onClose={() => setShowCreate(false)}
+          onClose={() => {
+            createExercise.reset();
+            setShowCreate(false);
+          }}
         />
       )}
     </div>
