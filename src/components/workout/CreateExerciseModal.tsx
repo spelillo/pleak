@@ -17,6 +17,7 @@ interface CreateExerciseModalProps {
   }) => void;
   onClose: () => void;
   isSaving?: boolean;
+  error?: string | null;
 }
 
 const CATEGORY_OPTIONS = [
@@ -41,7 +42,7 @@ function SelectChip({ label, active, onClick }: { label: string; active: boolean
   );
 }
 
-export function CreateExerciseModal({ exercises, onCreate, onClose, isSaving }: CreateExerciseModalProps) {
+export function CreateExerciseModal({ exercises, onCreate, onClose, isSaving, error }: CreateExerciseModalProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<"weightlifting" | "functional">("weightlifting");
   const [muscleGroup, setMuscleGroup] = useState<string | null>(null);
@@ -53,7 +54,8 @@ export function CreateExerciseModal({ exercises, onCreate, onClose, isSaving }: 
     return Array.from(groups).sort();
   }, [exercises]);
 
-  const canSave = name.trim().length > 0 && muscleGroup !== null && (category !== "weightlifting" || movementType !== null);
+  const isDuplicate = exercises.some((ex) => ex.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const canSave = !isDuplicate && name.trim().length > 0 && muscleGroup !== null && (category !== "weightlifting" || movementType !== null);
 
   function handleSave() {
     if (!canSave || !muscleGroup) return;
@@ -82,6 +84,7 @@ export function CreateExerciseModal({ exercises, onCreate, onClose, isSaving }: 
             placeholder="e.g. Cable Y-Raises"
             autoFocus
           />
+          {isDuplicate && <p className="mt-1.5 text-xs text-error">That exercise is already in your library.</p>}
         </div>
 
         <div className="mb-4">
@@ -133,6 +136,7 @@ export function CreateExerciseModal({ exercises, onCreate, onClose, isSaving }: 
       </div>
 
       <div className="border-t border-hairline p-4">
+        {error && <p className="mb-2 text-xs text-error">{error}</p>}
         <Button variant="primary" className="w-full" onClick={handleSave} disabled={!canSave || isSaving}>
           Save exercise
         </Button>

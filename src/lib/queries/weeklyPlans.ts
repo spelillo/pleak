@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
-import type { WeeklyPlanDay, WeeklyWorkoutPlan, WorkoutExercise } from "@/lib/types";
+import type { WeeklyPlanDay, WeeklyWorkoutPlan } from "@/lib/types";
 
 function plansKey(userId: string) {
   return ["weeklyWorkoutPlans", userId] as const;
@@ -8,6 +8,12 @@ function plansKey(userId: string) {
 
 function daysKey(weeklyPlanId: string, weekStartDate: string) {
   return ["weeklyPlanDays", weeklyPlanId, weekStartDate] as const;
+}
+
+// Saves and deletes for a plan's days run in order (see sessionsScope in
+// workoutSessions.ts for why).
+function daysScope(weeklyPlanId: string) {
+  return { id: `weeklyPlanDays:${weeklyPlanId}` };
 }
 
 export function useWeeklyWorkoutPlans(userId: string | undefined) {
@@ -23,8 +29,10 @@ export function useCreateWeeklyWorkoutPlan(userId: string) {
   return useMutation({
     mutationFn: (name: string) =>
       apiPost<WeeklyWorkoutPlan>("weeklyWorkoutPlans", "create", { userId, name, isActive: true }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: plansKey(userId) });
+    // Put the new plan in the cache right away so the day modal waiting on
+    // it can open without another round trip.
+    onSuccess: (plan) => {
+      queryClient.setQueryData<WeeklyWorkoutPlan[]>(plansKey(userId), (old) => [...(old ?? []), plan]);
     },
   });
 }
@@ -43,7 +51,9 @@ export function useWeeklyPlanDays(weeklyPlanId: string | undefined, weekStartDat
 }
 
 // Optimistic: the day card updates the instant "Save to plan" is pressed
-// instead of waiting on the database round trip. No onSuccess
+// instead of waiting on the database round trip. A new day gets its id
+// here and every save is an upsert, so saving the same day again before
+// the first save lands updates that row rather than failing. No onSuccess
 // reconciliation or onError rollback here, deliberately — see the same
 // tradeoff on useUpdateWorkoutSession in workoutSessions.ts. A day can be
 // saved again quickly (e.g. edit, then immediately start the workout, which
@@ -52,37 +62,13 @@ export function useWeeklyPlanDays(weeklyPlanId: string | undefined, weekStartDat
 export function useSaveWeeklyPlanDay(weeklyPlanId: string, weekStartDate: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id?: string; dayOfWeek: number; title: string; exercises: WorkoutExercise[] }) =>
-      input.id
-        ? apiPost<WeeklyPlanDay>("weeklyPlanDays", "update", {
-            id: input.id,
-            title: input.title,
-            exercises: input.exercises,
-          })
-        : apiPost<WeeklyPlanDay>("weeklyPlanDays", "create", {
-            weeklyPlanId,
-            weekStartDate,
-            dayOfWeek: input.dayOfWeek,
-            title: input.title,
-            isRestDay: false,
-            exercises: input.exercises,
-          }),
-    onMutate: async (input) => {
+    scope: daysScope(weeklyPlanId),
+    mutationFn: (day: WeeklyPlanDay) => apiPost<WeeklyPlanDay>("weeklyPlanDays", "upsert", { ...day }),
+    onMutate: async (day) => {
       await queryClient.cancelQueries({ queryKey: daysKey(weeklyPlanId, weekStartDate) });
-      const optimisticId = input.id ?? `optimistic-${crypto.randomUUID()}`;
-      const optimisticDay: WeeklyPlanDay = {
-        id: optimisticId,
-        weeklyPlanId,
-        weekStartDate,
-        dayOfWeek: input.dayOfWeek,
-        title: input.title,
-        isRestDay: false,
-        exercises: input.exercises,
-        createdAt: new Date().toISOString(),
-      };
       queryClient.setQueryData<WeeklyPlanDay[]>(daysKey(weeklyPlanId, weekStartDate), (old) => [
-        ...(old ?? []).filter((d) => d.id !== optimisticId),
-        optimisticDay,
+        ...(old ?? []).filter((d) => d.id !== day.id && d.dayOfWeek !== day.dayOfWeek),
+        day,
       ]);
     },
   });
@@ -92,6 +78,7 @@ export function useSaveWeeklyPlanDay(weeklyPlanId: string, weekStartDate: string
 export function useDeleteWeeklyPlanDay(weeklyPlanId: string, weekStartDate: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    scope: daysScope(weeklyPlanId),
     mutationFn: (id: string) => apiPost<{ success: boolean }>("weeklyPlanDays", "delete", { id }),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: daysKey(weeklyPlanId, weekStartDate) });

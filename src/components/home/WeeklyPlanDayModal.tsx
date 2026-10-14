@@ -48,13 +48,31 @@ export function WeeklyPlanDayModal({
   const reduceMotion = useReducedMotion();
 
   const [step, setStep] = useState<Step>(existing ? "curate" : "type");
-  const [selectedType, setSelectedType] = useState<WorkoutTypeOption | null>(null);
+  // A day saved as "just the type" comes back with only its title, so
+  // recover the type from it to keep shuffle/generate available.
+  const [selectedType, setSelectedType] = useState<WorkoutTypeOption | null>(
+    () => WORKOUT_TYPES.find((t) => existing?.title === `${t.label} Day`) ?? null,
+  );
+  const [dayId] = useState(() => existing?.id ?? crypto.randomUUID());
   const [title, setTitle] = useState(existing?.title ?? "");
   const [draft, setDraft] = useState<WorkoutExercise[]>(existing?.exercises ?? []);
   const [showPicker, setShowPicker] = useState(false);
 
   const draftIds = new Set(draft.map((ex) => ex.exerciseId));
   const availableToAdd = (library ?? []).filter((ex) => !draftIds.has(ex.id));
+
+  function buildDay(dayTitle: string, exercises: WorkoutExercise[]): WeeklyPlanDay {
+    return {
+      id: dayId,
+      weeklyPlanId,
+      weekStartDate,
+      dayOfWeek,
+      title: dayTitle,
+      isRestDay: false,
+      exercises,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+  }
 
   function handleSelectType(type: WorkoutTypeOption) {
     setSelectedType(type);
@@ -63,8 +81,7 @@ export function WeeklyPlanDayModal({
   }
 
   function handleSaveTypeOnly() {
-    saveDay.mutate(
-      { id: existing?.id, dayOfWeek, title: title || `${selectedType?.label} Day`, exercises: [] },
+    saveDay.mutate(buildDay(title || `${selectedType?.label} Day`, []),
       { onError: () => onError("Couldn't save your plan — check your connection.") },
     );
     onClose();
@@ -85,8 +102,7 @@ export function WeeklyPlanDayModal({
   }
 
   function handleSave() {
-    saveDay.mutate(
-      { id: existing?.id, dayOfWeek, title: title || "Workout", exercises: draft },
+    saveDay.mutate(buildDay(title || "Workout", draft),
       { onError: () => onError("Couldn't save your plan — check your connection.") },
     );
     onClose();
@@ -111,13 +127,19 @@ export function WeeklyPlanDayModal({
     // a failed save doesn't leave a workout session started from exercises
     // that never made it into the plan.
     try {
-      await saveDay.mutateAsync({ id: existing?.id, dayOfWeek, title: title || "Workout", exercises: draft });
+      await saveDay.mutateAsync(buildDay(title || "Workout", draft));
     } catch {
       onError("Couldn't save your plan — check your connection.");
       return;
     }
     startSession.mutate(
-      { username, name: title || "Workout", exercises: draft, startTime: new Date().toISOString() },
+      {
+        id: crypto.randomUUID(),
+        username,
+        name: title || "Workout",
+        exercises: draft,
+        startTime: new Date().toISOString(),
+      },
       { onError: () => onError("Couldn't start the workout — check your connection and try again.") },
     );
     onStartWorkout();
@@ -218,7 +240,11 @@ export function WeeklyPlanDayModal({
             </div>
 
             {draft.length === 0 ? (
-              <EmptyState icon={<Barbell size={20} />} title="No exercises yet" description="Add exercises below." />
+              <EmptyState
+                icon={<Barbell size={20} />}
+                title="No exercises yet"
+                description={selectedType ? "Tap shuffle to generate some, or add them below." : "Add exercises below."}
+              />
             ) : (
               <div className="flex flex-col gap-3">
                 {draft.map((exercise, index) => (

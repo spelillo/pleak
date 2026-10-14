@@ -25,6 +25,7 @@ export function Profile() {
   const { user, signOut, updateProfile } = useAuth();
   const [weightInput, setWeightInput] = useState(() => user?.weight?.toString() ?? "");
   const [isSavingWeight, setIsSavingWeight] = useState(false);
+  const [weightError, setWeightError] = useState<string | null>(null);
 
   const { data: sessions } = useWorkoutSessions(user?.id);
   const weekStart = useMemo(() => startOfWeek(new Date()), []);
@@ -41,10 +42,20 @@ export function Profile() {
 
   function handleWeightBlur(e: FocusEvent<HTMLInputElement>) {
     const value = e.target.value.trim();
-    const nextWeight = value ? Number(value) : undefined;
-    if (nextWeight === user?.weight) return;
+    const nextWeight = value ? Number(value) : null;
+    if (nextWeight !== null && (!Number.isFinite(nextWeight) || nextWeight <= 0)) {
+      setWeightError("Enter a weight above 0.");
+      return;
+    }
+    setWeightError(null);
+    if (nextWeight === (user?.weight ?? null)) return;
     setIsSavingWeight(true);
-    updateProfile({ weight: nextWeight }).finally(() => setIsSavingWeight(false));
+    updateProfile({ weight: nextWeight })
+      .catch(() => {
+        setWeightError("Couldn't save your weight. Check your connection and try again.");
+        setWeightInput(user?.weight?.toString() ?? "");
+      })
+      .finally(() => setIsSavingWeight(false));
   }
 
   return (
@@ -79,6 +90,7 @@ export function Profile() {
             />
             <span className="text-sm text-muted">lb{isSavingWeight && " · Saving…"}</span>
           </div>
+          {weightError && <span className="text-xs text-error">{weightError}</span>}
         </label>
       </Card>
 

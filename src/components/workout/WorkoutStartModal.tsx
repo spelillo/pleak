@@ -74,7 +74,13 @@ export function WorkoutStartModal({
     // by useStartWorkoutSession's onMutate, so we can jump straight into the
     // workout instead of waiting on the database round trip.
     startSession.mutate(
-      { username, name: `${selectedType.label} Day`, exercises: draft, startTime: new Date().toISOString() },
+      {
+        id: crypto.randomUUID(),
+        username,
+        name: `${selectedType.label} Day`,
+        exercises: draft,
+        startTime: new Date().toISOString(),
+      },
       { onError: () => onError("Couldn't start the workout — check your connection and try again.") },
     );
     onStarted();
