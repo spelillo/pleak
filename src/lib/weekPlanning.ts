@@ -28,7 +28,9 @@ export function addDays(date: Date, n: number): Date {
 // Google Sheets, and read back as a full ISO timestamp shifted by the
 // spreadsheet's timezone ("2026-08-16T04:00:00.000Z") — which then fails
 // the backend's exact-string list filter and the day never shows as
-// planned even though it saved. Prefixing keeps it plain text.
+// planned even though it saved. Prefixing keeps it plain text. Supabase
+// stores it as text, but the prefix stays so rows imported from Sheets
+// keep matching.
 export function toDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");

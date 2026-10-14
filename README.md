@@ -1,18 +1,23 @@
 # Pleak
 
-A simple workout tracker for a small group of people, hosted on GitHub Pages with Google Sheets as the database.
+A simple workout tracker for a small group of people, hosted on Vercel with Supabase as the database.
 
 ## Stack
 
 - React + TypeScript + Vite
 - Tailwind CSS v4 (brand tokens in [`src/index.css`](src/index.css))
-- Google Apps Script Web App + Google Sheets (data layer)
-- Google Sign-In (auth) — see [docs/google-signin-setup.md](docs/google-signin-setup.md)
+- Supabase Postgres with row-level security (data layer), schema in [`supabase/migrations`](supabase/migrations)
+- Google Sign-In, verified by Supabase Auth
+- Vercel (hosting), config in [`vercel.json`](vercel.json)
+
+Setup and the move off Google Sheets / GitHub Pages: [docs/supabase-vercel-setup.md](docs/supabase-vercel-setup.md).
+The old Apps Script backend (`apps-script/`, [docs/apps-script-setup.md](docs/apps-script-setup.md)) is kept only until cutover.
 
 ## Development
 
 ```bash
 npm install
+cp .env.example .env.local   # fill in Supabase + Google values
 npm run dev
 ```
 
@@ -22,7 +27,7 @@ npm run dev
 npm run build
 ```
 
-Deploys automatically to GitHub Pages on push to `main` via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+Vercel deploys `main` automatically and builds a preview for every branch. The legacy GitHub Pages workflow ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) still runs until it's retired.
 
 ## Brand assets
 

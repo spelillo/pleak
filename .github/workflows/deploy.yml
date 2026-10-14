@@ -26,9 +26,12 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          # Legacy GitHub Pages deploy, kept until the Vercel cutover is done
+          # (see docs/supabase-vercel-setup.md). Pages serves under /pleak/.
+          BASE_PATH: /pleak/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

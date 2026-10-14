@@ -1,7 +1,8 @@
-// Data shapes for the Pleak Apps Script API. Mirrors the sheet tabs defined
-// in apps-script/Config.gs. Field set is trimmed from the original LifeBud
-// schema per the Phase 1 scope decisions (no billing, social, GPS, AI, or
-// password fields) — see docs/design-guidelines.md and the project plan.
+// Data shapes for Pleak's data. Mirrors the Supabase tables in
+// supabase/migrations (snake_case there; src/lib/api.ts converts). Field
+// set is trimmed from the original LifeBud schema per the Phase 1 scope
+// decisions (no billing, social, GPS, AI, or password fields) — see
+// docs/design-guidelines.md and the project plan.
 
 export interface User {
   id: string;

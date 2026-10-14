@@ -72,7 +72,7 @@ export function WorkoutStartModal({
     if (!draft || draft.length === 0 || !selectedType) return;
     // Optimistic: the session is written into the query cache synchronously
     // by useStartWorkoutSession's onMutate, so we can jump straight into the
-    // workout instead of waiting on the Apps Script round trip.
+    // workout instead of waiting on the database round trip.
     startSession.mutate(
       { username, name: `${selectedType.label} Day`, exercises: draft, startTime: new Date().toISOString() },
       { onError: () => onError("Couldn't start the workout — check your connection and try again.") },

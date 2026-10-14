@@ -26,7 +26,7 @@ export function useWorkoutSessions(userId: string | undefined) {
 
 // Optimistic: the session appears in the list (and ActiveWorkout renders)
 // the instant the user hits "Start workout", rather than waiting on the
-// Apps Script round trip. onSuccess swaps the placeholder for the real
+// database round trip. onSuccess swaps the placeholder for the real
 // record; onError rolls the list back so the UI matches what's actually saved.
 export function useStartWorkoutSession(userId: string) {
   const queryClient = useQueryClient();

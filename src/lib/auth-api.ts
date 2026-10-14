@@ -1,36 +1,46 @@
-import { API_KEY, ApiError } from "@/lib/api";
+import { ApiError, rowToRecord } from "@/lib/api";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { User } from "@/lib/types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
-
-export async function loginWithGoogle(idToken: string): Promise<User> {
-  if (!API_BASE_URL) {
+function requireConfig() {
+  if (!isSupabaseConfigured) {
     throw new ApiError(
-      "VITE_API_BASE_URL is not set. Add the deployed Apps Script Web App URL to .env.local.",
+      "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.",
     );
   }
-  const url = new URL(API_BASE_URL);
-  url.searchParams.set("resource", "auth");
-  url.searchParams.set("action", "login");
-  if (API_KEY) url.searchParams.set("apiKey", API_KEY);
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ idToken }),
-  });
-  const text = await res.text();
-  let json: unknown;
+}
+
+/**
+ * Fetches (or creates, on first sign-in) the signed-in person's Pleak user
+ * row. The pleak_login() database function checks the email allowlist and
+ * links rows imported from Google Sheets by email.
+ */
+export async function fetchAppUser(): Promise<User> {
+  requireConfig();
+  const { data, error } = await supabase.rpc("pleak_login");
+  if (error) throw new ApiError(error.message);
+  return rowToRecord<User>(data as Record<string, unknown>);
+}
+
+/**
+ * Exchanges a Google Identity Services ID token for a Supabase session, then
+ * loads the app user. `nonce` is the raw nonce whose SHA-256 was handed to
+ * Google when the sign-in button was initialized.
+ */
+export async function loginWithGoogle(idToken: string, nonce: string): Promise<User> {
+  requireConfig();
+  const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken, nonce });
+  if (error) throw new ApiError(error.message);
   try {
-    json = JSON.parse(text);
-  } catch {
-    throw new ApiError(`Non-JSON response from API: ${text.slice(0, 200)}`);
+    return await fetchAppUser();
+  } catch (err) {
+    // Not on the allowlist (or the profile lookup failed): don't leave a
+    // half-signed-in Supabase session behind.
+    await supabase.auth.signOut();
+    throw err;
   }
-  if (!res.ok || (json && typeof json === "object" && "error" in json)) {
-    const message =
-      json && typeof json === "object" && "error" in json
-        ? String((json as { error: unknown }).error)
-        : `Request failed with status ${res.status}`;
-    throw new ApiError(message);
-  }
-  return json as User;
+}
+
+export async function signOutOfSupabase(): Promise<void> {
+  await supabase.auth.signOut();
 }
