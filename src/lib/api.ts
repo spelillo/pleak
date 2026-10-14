@@ -1,15 +1,12 @@
+import { isSupabaseConfigured, supabase } from "./supabase";
 import type { ResourceName } from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
-
-// Shared secret the Apps Script router checks on every request (see
-// isAuthorizedRequest_ in apps-script/Router.gs). This is a modest bar, not
-// real per-user auth — it's baked into the built JS bundle like any
-// client-embedded secret in a server-less static app, so treat it as a
-// deterrent against casual/automated hits on the URL, not a guarantee.
-// Exported so auth-api.ts (which makes its own request outside apiGet/
-// apiPost) can attach it too.
-export const API_KEY = import.meta.env.VITE_API_KEY as string | undefined;
+// Thin data layer over Supabase that keeps the same apiGet/apiPost shape the
+// old Apps Script API had, so the query hooks in src/lib/queries didn't need
+// to change. Tables and columns are the snake_case form of the resource
+// names and fields in types.ts; rows are converted at this boundary.
+// Per-user access is enforced by row-level security in the database (see
+// supabase/migrations), not here.
 
 export class ApiError extends Error {
   constructor(message: string) {
@@ -18,69 +15,109 @@ export class ApiError extends Error {
   }
 }
 
-function requireBaseUrl(): string {
-  if (!API_BASE_URL) {
-    throw new ApiError(
-      "VITE_API_BASE_URL is not set. Add the deployed Apps Script Web App URL to .env.local.",
-    );
-  }
-  return API_BASE_URL;
+const TABLES: Record<ResourceName, string> = {
+  users: "users",
+  exercises: "exercises",
+  workoutPlans: "workout_plans",
+  workoutSessions: "workout_sessions",
+  scheduledWorkouts: "scheduled_workouts",
+  goals: "goals",
+  personalRecords: "personal_records",
+  weeklyWorkoutPlans: "weekly_workout_plans",
+  weeklyPlanDays: "weekly_plan_days",
+  weeklyPlanCompletions: "weekly_plan_completions",
+};
+
+function toSnake(key: string): string {
+  return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 }
 
-async function parseResponse<T>(res: Response): Promise<T> {
-  const text = await res.text();
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new ApiError(`Non-JSON response from API: ${text.slice(0, 200)}`);
+function toCamel(key: string): string {
+  return key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+// Only top-level keys are converted; jsonb columns (exercises, muscleGroups)
+// keep their camelCase contents as stored.
+export function rowToRecord<T>(row: Record<string, unknown>): T {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) out[toCamel(key)] = value;
+  return out as T;
+}
+
+function recordToRow(record: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (value !== undefined) out[toSnake(key)] = value;
   }
-  if (!res.ok || (json && typeof json === "object" && "error" in json)) {
-    const message =
-      json && typeof json === "object" && "error" in json
-        ? String((json as { error: unknown }).error)
-        : `Request failed with status ${res.status}`;
-    throw new ApiError(message);
+  return out;
+}
+
+function requireConfig() {
+  if (!isSupabaseConfigured) {
+    throw new ApiError(
+      "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.",
+    );
   }
-  return json as T;
+}
+
+function fail(error: { message: string }): never {
+  throw new ApiError(error.message);
 }
 
 /**
- * GET requests carry resource/action/params as query params.
+ * action=list (default): every row matching the remaining params as exact
+ * equality filters. action=get: the row with params.id, or null.
  */
 export async function apiGet<T>(
   resource: ResourceName,
   params: Record<string, string | undefined> = {},
 ): Promise<T> {
-  const url = new URL(requireBaseUrl());
-  url.searchParams.set("resource", resource);
-  if (API_KEY) url.searchParams.set("apiKey", API_KEY);
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) url.searchParams.set(key, value);
+  requireConfig();
+  const { action = "list", ...filters } = params;
+  let query = supabase.from(TABLES[resource]).select("*");
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined) query = query.eq(toSnake(key), value);
   }
-  const res = await fetch(url.toString());
-  return parseResponse<T>(res);
+  if (action === "get") {
+    const { data, error } = await query.maybeSingle();
+    if (error) fail(error);
+    return (data ? rowToRecord(data) : null) as T;
+  }
+  const { data, error } = await query;
+  if (error) fail(error);
+  return (data ?? []).map((row) => rowToRecord(row)) as T;
 }
 
 /**
- * POST requests use action=create|update|delete via query params, with the
- * JSON payload in the body. Sent as text/plain (not application/json) so the
- * browser treats it as a CORS-simple request and skips the OPTIONS preflight
- * that Apps Script Web Apps don't handle.
+ * create: inserts the payload and returns the stored row.
+ * update: patches the row with payload.id and returns the merged row.
+ * delete: removes the row with payload.id.
  */
 export async function apiPost<T>(
   resource: ResourceName,
   action: "create" | "update" | "delete",
   payload: Record<string, unknown>,
 ): Promise<T> {
-  const url = new URL(requireBaseUrl());
-  url.searchParams.set("resource", resource);
-  url.searchParams.set("action", action);
-  if (API_KEY) url.searchParams.set("apiKey", API_KEY);
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-  return parseResponse<T>(res);
+  requireConfig();
+  const table = supabase.from(TABLES[resource]);
+
+  if (action === "create") {
+    const { data, error } = await table.insert(recordToRow(payload)).select().single();
+    if (error) fail(error);
+    return rowToRecord<T>(data);
+  }
+
+  const { id, ...patch } = payload;
+  if (!id) throw new ApiError(`${action} requires an id`);
+
+  if (action === "update") {
+    const { data, error } = await table.update(recordToRow(patch)).eq("id", id).select().maybeSingle();
+    if (error) fail(error);
+    if (!data) throw new ApiError(`No ${resource} row with id ${String(id)}`);
+    return rowToRecord<T>(data);
+  }
+
+  const { error } = await table.delete().eq("id", id);
+  if (error) fail(error);
+  return { success: true } as T;
 }

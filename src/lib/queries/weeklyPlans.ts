@@ -43,7 +43,7 @@ export function useWeeklyPlanDays(weeklyPlanId: string | undefined, weekStartDat
 }
 
 // Optimistic: the day card updates the instant "Save to plan" is pressed
-// instead of waiting on the Apps Script round trip. No onSuccess
+// instead of waiting on the database round trip. No onSuccess
 // reconciliation or onError rollback here, deliberately — see the same
 // tradeoff on useUpdateWorkoutSession in workoutSessions.ts. A day can be
 // saved again quickly (e.g. edit, then immediately start the workout, which

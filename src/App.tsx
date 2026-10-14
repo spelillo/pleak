@@ -16,7 +16,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Apps Script calls are lightweight one-shot requests. No automatic
+      // Supabase calls are lightweight one-shot requests. No automatic
       // retries (a retry attempt pauses pending reconnection under the
       // default 'online' networkMode, which reads as a stuck loading
       // state) and no offline pause — a real failure just surfaces as a

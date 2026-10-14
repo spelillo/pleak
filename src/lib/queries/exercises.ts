@@ -5,11 +5,9 @@ import type { Exercise } from "@/lib/types";
 
 const exercisesKey = ["exercises"] as const;
 
-// The API returns every exercise row to every caller (see Router.gs — there's
-// no per-request identity, just a shared secret). Custom exercises carry the
-// creator's userId, so we scope the list client-side to system exercises
-// (no userId) plus the signed-in user's own, keeping other users' custom
-// exercises out of view without needing real server-side auth.
+// Row-level security already limits this to system exercises (no userId)
+// plus the signed-in user's own; the client-side filter is kept as a
+// belt-and-braces guard.
 export function useExercises() {
   const { user } = useAuth();
   return useQuery({

@@ -6,9 +6,11 @@ import { fileURLToPath } from 'url'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Served from the domain root on Vercel. The legacy GitHub Pages build sets
+// BASE_PATH=/pleak/ (see .github/workflows/deploy.yml).
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/pleak/',
+  base: process.env.BASE_PATH ?? '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
