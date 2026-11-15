@@ -101,7 +101,11 @@ export function Modal({ onClose, children, className, ariaLabel }: ModalProps) {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") dismiss();
+      if (e.key !== "Escape") return;
+      // With sheets stacked, Escape closes only the topmost one.
+      const sheets = document.querySelectorAll("[data-sheet]");
+      if (sheets.length > 0 && sheets[sheets.length - 1] !== sheetRef.current) return;
+      dismiss();
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);

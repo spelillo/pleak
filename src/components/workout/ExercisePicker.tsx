@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/Input";
+import { CreateExerciseModal } from "@/components/workout/CreateExerciseModal";
 import type { Exercise } from "@/lib/types";
 
 interface ExercisePickerProps {
@@ -8,6 +9,8 @@ interface ExercisePickerProps {
   onSelect: (exercise: Exercise) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  /** Shows a "Create exercise" button; a newly created exercise is selected. */
+  allowCreate?: boolean;
 }
 
 function matchesQuery(exercise: Exercise, query: string) {
@@ -20,8 +23,10 @@ export function ExercisePicker({
   onSelect,
   placeholder = "Search exercises…",
   autoFocus,
+  allowCreate,
 }: ExercisePickerProps) {
   const [query, setQuery] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const matches = normalizedQuery
     ? exercises.filter((ex) => matchesQuery(ex, normalizedQuery)).slice(0, 8)
@@ -67,6 +72,29 @@ export function ExercisePicker({
             ))}
           </ul>
         ))}
+
+      {allowCreate && (
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md bg-surface-card px-4 py-3 text-sm font-semibold text-brand-blue transition-[background-color,transform] duration-100 active:scale-[0.98] active:bg-surface-strong"
+        >
+          <Plus size={16} weight="bold" />
+          {normalizedQuery && matches.length === 0 ? `Create “${query.trim()}”` : "Create new exercise"}
+        </button>
+      )}
+
+      {showCreate && (
+        <CreateExerciseModal
+          initialName={matches.length === 0 ? query.trim() : ""}
+          onCreated={(ex) => {
+            setShowCreate(false);
+            setQuery("");
+            onSelect(ex);
+          }}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
     </div>
   );
 }

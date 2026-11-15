@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PillTabs } from "@/components/ui/PillTabs";
 import { CreateExerciseModal } from "@/components/workout/CreateExerciseModal";
-import { useExercises, useCreateExercise } from "@/lib/queries/exercises";
+import { useExercises } from "@/lib/queries/exercises";
 import { ApiError } from "@/lib/api";
 import { categoryLabel } from "@/lib/exerciseLabels";
 import type { Exercise } from "@/lib/types";
@@ -20,7 +20,6 @@ function matchesQuery(exercise: Exercise, query: string) {
 
 export function ExerciseLibrary() {
   const { data: exercises, isLoading, isError, error } = useExercises();
-  const createExercise = useCreateExercise();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -48,7 +47,7 @@ export function ExerciseLibrary() {
 
       <Button className="mb-4 w-full justify-center" onClick={() => setShowCreate(true)}>
         <Plus size={16} weight="bold" />
-        Add exercise
+        Create exercise
       </Button>
 
       {isError && (
@@ -119,18 +118,7 @@ export function ExerciseLibrary() {
       )}
 
       {showCreate && (
-        <CreateExerciseModal
-          exercises={exercises ?? []}
-          isSaving={createExercise.isPending}
-          error={createExercise.error ? "Couldn't save the exercise. Check your connection and try again." : null}
-          onCreate={(input) => {
-            createExercise.mutate(input, { onSuccess: () => setShowCreate(false) });
-          }}
-          onClose={() => {
-            createExercise.reset();
-            setShowCreate(false);
-          }}
-        />
+        <CreateExerciseModal onCreated={() => setShowCreate(false)} onClose={() => setShowCreate(false)} />
       )}
     </div>
   );
