@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, ArrowsClockwise, Barbell, Plus, Trash, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowsClockwise, Barbell, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -12,7 +12,7 @@ import { useExercises } from "@/lib/queries/exercises";
 import { useSaveWeeklyPlanDay, useDeleteWeeklyPlanDay } from "@/lib/queries/weeklyPlans";
 import { useStartWorkoutSession, useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import { generateDraftExercises, toWorkoutExercise, WORKOUT_TYPES, type WorkoutTypeOption } from "@/lib/workoutGeneration";
-import type { WeeklyPlanDay, WorkoutExercise } from "@/lib/types";
+import type { Exercise, WeeklyPlanDay, WorkoutExercise } from "@/lib/types";
 
 type Step = "type" | "choice" | "curate";
 
@@ -57,6 +57,8 @@ export function WeeklyPlanDayModal({
   const [title, setTitle] = useState(existing?.title ?? "");
   const [draft, setDraft] = useState<WorkoutExercise[]>(existing?.exercises ?? []);
   const [showPicker, setShowPicker] = useState(false);
+  // Index of the exercise being swapped, whose row shows the picker.
+  const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
 
   const draftIds = new Set(draft.map((ex) => ex.exerciseId));
   const availableToAdd = (library ?? []).filter((ex) => !draftIds.has(ex.id));
@@ -99,6 +101,31 @@ export function WeeklyPlanDayModal({
 
   function handleRemoveExercise(index: number) {
     setDraft((prev) => prev.filter((_, i) => i !== index));
+    setSwappingIndex(null);
+  }
+
+  // Replaces the exercise in place, keeping its position. Its planned sets
+  // carry over when the new exercise is logged the same way (weights vs
+  // cardio); otherwise it gets that type's default sets.
+  function handleSwapExercise(index: number, replacement: Exercise) {
+    setDraft((prev) =>
+      prev.map((current, i) => {
+        if (i !== index) return current;
+        const next = toWorkoutExercise(replacement);
+        return next.exerciseType === current.exerciseType
+          ? { ...next, sets: current.sets.map((set) => ({ ...set, completed: false })) }
+          : next;
+      }),
+    );
+    setSwappingIndex(null);
+  }
+
+  // Same primary muscle group first, so the obvious swaps are one tap away.
+  function swapSuggestions(index: number): Exercise[] {
+    const current = library?.find((ex) => ex.id === draft[index]?.exerciseId);
+    const group = current?.muscleGroups[0];
+    if (!group) return [];
+    return availableToAdd.filter((ex) => ex.muscleGroups[0] === group && ex.category === current.category);
   }
 
   function handleSave() {
@@ -248,18 +275,50 @@ export function WeeklyPlanDayModal({
             ) : (
               <div className="flex flex-col gap-3">
                 {draft.map((exercise, index) => (
-                  <Card key={exercise.exerciseId} variant="outline" className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-sm font-medium text-ink">
-                      {index + 1}. {exercise.name}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveExercise(index)}
-                      aria-label={`Remove ${exercise.name}`}
-                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-error"
-                    >
-                      <Trash size={16} />
-                    </button>
+                  <Card key={exercise.exerciseId} variant="outline">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm font-medium text-ink">
+                        {index + 1}. {exercise.name}
+                      </p>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPicker(false);
+                            setSwappingIndex((current) => (current === index ? null : index));
+                          }}
+                          aria-label={`Swap ${exercise.name}`}
+                          aria-expanded={swappingIndex === index}
+                          className={
+                            swappingIndex === index
+                              ? "flex size-8 items-center justify-center rounded-full bg-brand-blue/12 text-brand-blue"
+                              : "flex size-8 items-center justify-center rounded-full text-muted hover:text-brand-blue"
+                          }
+                        >
+                          <PencilSimple size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExercise(index)}
+                          aria-label={`Remove ${exercise.name}`}
+                          className="flex size-8 items-center justify-center rounded-full text-muted hover:text-error"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    {swappingIndex === index && (
+                      <div className="mt-3">
+                        <ExercisePicker
+                          exercises={availableToAdd}
+                          suggestions={swapSuggestions(index)}
+                          suggestionsLabel={`Swap for another ${library?.find((ex) => ex.id === exercise.exerciseId)?.muscleGroups[0]?.toLowerCase() ?? ""} exercise, or search`}
+                          onSelect={(ex) => handleSwapExercise(index, ex)}
+                          placeholder={`Replace ${exercise.name}…`}
+                          allowCreate
+                        />
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -267,7 +326,10 @@ export function WeeklyPlanDayModal({
 
             <button
               type="button"
-              onClick={() => setShowPicker((v) => !v)}
+              onClick={() => {
+                setSwappingIndex(null);
+                setShowPicker((v) => !v);
+              }}
               className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-blue/10 px-4 py-3 text-sm font-semibold text-brand-blue transition-[background-color,transform] duration-100 active:scale-[0.98] active:bg-brand-blue/15"
             >
               <Plus size={16} weight="bold" />

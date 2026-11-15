@@ -11,6 +11,9 @@ interface ExercisePickerProps {
   autoFocus?: boolean;
   /** Shows a "Create exercise" button; a newly created exercise is selected. */
   allowCreate?: boolean;
+  /** Shown before anything is typed, e.g. alternatives for a swap. */
+  suggestions?: Exercise[];
+  suggestionsLabel?: string;
 }
 
 function matchesQuery(exercise: Exercise, query: string) {
@@ -24,13 +27,16 @@ export function ExercisePicker({
   placeholder = "Search exercises…",
   autoFocus,
   allowCreate,
+  suggestions,
+  suggestionsLabel,
 }: ExercisePickerProps) {
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const matches = normalizedQuery
     ? exercises.filter((ex) => matchesQuery(ex, normalizedQuery)).slice(0, 8)
-    : [];
+    : (suggestions ?? []).slice(0, 8);
+  const showList = !!normalizedQuery || matches.length > 0;
 
   return (
     <div>
@@ -48,7 +54,10 @@ export function ExercisePicker({
         />
       </div>
 
-      {normalizedQuery &&
+      {!normalizedQuery && matches.length > 0 && suggestionsLabel && (
+        <p className="mt-3 px-1 text-xs font-medium text-muted">{suggestionsLabel}</p>
+      )}
+      {showList &&
         (matches.length === 0 ? (
           <p className="mt-2 px-1 text-xs text-muted">No matching exercises.</p>
         ) : (
@@ -86,7 +95,7 @@ export function ExercisePicker({
 
       {showCreate && (
         <CreateExerciseModal
-          initialName={matches.length === 0 ? query.trim() : ""}
+          initialName={normalizedQuery && matches.length === 0 ? query.trim() : ""}
           onCreated={(ex) => {
             setShowCreate(false);
             setQuery("");
