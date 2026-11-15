@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { CalendarBlank, CaretLeft, CaretRight, CheckCircle, CircleNotch, Plus } from "@phosphor-icons/react";
+import { CalendarBlank, CaretLeft, CaretRight, CheckCircle, CircleNotch, Plus, Sparkle } from "@phosphor-icons/react";
 import { motion, useReducedMotion } from "motion/react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -10,6 +11,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { useCreateWeeklyWorkoutPlan, useWeeklyPlanDays, useWeeklyWorkoutPlans } from "@/lib/queries/weeklyPlans";
 import { addDays, DAY_LABELS, FULL_DAY_LABELS, formatWeekRange, isSameDay, startOfWeek, toDateKey } from "@/lib/weekPlanning";
 import { WeeklyPlanDayModal } from "@/components/home/WeeklyPlanDayModal";
+import { PlanAssistantModal } from "@/components/home/PlanAssistantModal";
+import { useExercises } from "@/lib/queries/exercises";
+import { generateWeek, savePlanConfig, saveWeek, splitDisplayName } from "@/lib/queries/planAssistant";
 import type { WeeklyPlanDay } from "@/lib/types";
 
 export function WeeklyPlanner({ onError }: { onError: (message: string) => void }) {
@@ -61,6 +65,52 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
     setActiveDay({ dayOfWeek, date, existing });
   }
 
+  const [showAssistant, setShowAssistant] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: library } = useExercises();
+  const aiConfig = activePlan?.aiConfig ?? null;
+  const currentWeekKey = toDateKey(startOfWeek(today));
+
+  // Weekly refresh for plans made with the assistant: the first time an
+  // empty week from now on is opened, fill it with the next turn of the
+  // split rotation and fresh exercises. Each week is filled at most once
+  // (generatedWeeks), so a week the user clears on purpose stays clear.
+  const [fillingWeek, setFillingWeek] = useState<string | null>(null);
+  const fillStarted = useRef(new Set<string>());
+  const needsFill =
+    !!aiConfig &&
+    !!activePlan &&
+    !!library &&
+    !isDaysPending &&
+    (days?.length ?? 0) === 0 &&
+    weekStartKey >= currentWeekKey &&
+    weekStartKey >= aiConfig.anchorWeek &&
+    !aiConfig.generatedWeeks.includes(weekStartKey);
+
+  useEffect(() => {
+    if (!needsFill || !aiConfig || !activePlan || !library) return;
+    const weekKey = weekStartKey;
+    if (fillStarted.current.has(weekKey)) return;
+    fillStarted.current.add(weekKey);
+    setFillingWeek(weekKey);
+    (async () => {
+      try {
+        const week = await generateWeek({ config: aiConfig, weekKey, library, weeklyPlanId: activePlan.id });
+        await saveWeek(queryClient, activePlan.id, weekKey, week.days);
+        await savePlanConfig(queryClient, userId, activePlan, {
+          ...aiConfig,
+          generatedWeeks: [...aiConfig.generatedWeeks, weekKey].slice(-60),
+        });
+      } catch {
+        fillStarted.current.delete(weekKey);
+        onError("Couldn't fill in this week's plan. Check your connection.");
+      } finally {
+        setFillingWeek((w) => (w === weekKey ? null : w));
+      }
+    })();
+  }, [needsFill, aiConfig, activePlan, library, weekStartKey, queryClient, userId, onError]);
+
+  const isFilling = fillingWeek === weekStartKey;
   const plannedCount = days?.length ?? 0;
   const todayEntry = daysByIndex.get(today.getDay());
 
@@ -106,7 +156,7 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
               type="button"
               onClick={() => handleDayClick(i, date)}
               aria-label={`${planned ? "Edit" : "Plan"} ${FULL_DAY_LABELS[i]}`}
-              disabled={isLoading}
+              disabled={isLoading || isFilling}
               whileTap={reduceMotion ? undefined : { scale: 0.96 }}
               transition={springDefault}
               className={cn(
@@ -130,6 +180,13 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
         })}
       </div>
 
+      {isFilling && (
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted" aria-live="polite">
+          <CircleNotch size={14} className="animate-spin" />
+          Building this week with fresh exercises
+        </p>
+      )}
+
       {isCurrentWeek && (
         <div className="mt-4 rounded-md bg-surface-soft px-4 py-3">
           <p className="text-sm font-semibold text-ink">Today: {FULL_DAY_LABELS[today.getDay()]}</p>
@@ -137,6 +194,43 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
             {isLoading ? "Loading…" : todayEntry ? todayEntry.title || "Workout planned" : "No workout planned"}
           </p>
         </div>
+      )}
+
+      <motion.button
+        type="button"
+        onClick={() => setShowAssistant(true)}
+        disabled={isPlansPending}
+        whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+        transition={springDefault}
+        className="mt-4 flex w-full items-center gap-3 rounded-md bg-brand-blue/12 px-4 py-3 text-left transition-colors active:bg-brand-blue/20 disabled:opacity-60"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-blue text-on-primary">
+          <Sparkle size={18} weight="fill" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink">
+            {aiConfig ? "Rebuild my plan" : "Help build my plan"}
+          </span>
+          <span className="block truncate text-sm text-muted">
+            {aiConfig
+              ? `${splitDisplayName(aiConfig)}, ${aiConfig.trainingDays.length} days a week`
+              : "Pick a split and your days. AI fills in the week."}
+          </span>
+        </span>
+        <CaretRight size={16} className="shrink-0 text-muted" />
+      </motion.button>
+
+      {showAssistant && (
+        <PlanAssistantModal
+          userId={userId}
+          activePlan={activePlan}
+          onClose={() => setShowAssistant(false)}
+          onError={onError}
+          onSaved={(start) => {
+            setShowAssistant(false);
+            setWeekStart(start);
+          }}
+        />
       )}
 
       {activeDay && activePlan && (
