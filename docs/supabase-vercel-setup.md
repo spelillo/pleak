@@ -86,6 +86,25 @@ setting the variables, since Vite bakes them in at build time.
 For local dev, put the same three values in `.env.local` (see
 `.env.example`).
 
+### AI plan builder (required for "Help build my plan")
+
+The home screen's plan assistant calls Groq from the serverless function
+in `api/plan-builder.ts`. Its key is server-only: add it in Vercel →
+Settings → Environment Variables (Production and Preview), then redeploy.
+
+| Name | Value |
+| --- | --- |
+| `GROQ_API_KEY` | console.groq.com → API Keys |
+| `GROQ_MODEL` | Optional. Defaults to `llama-3.3-70b-versatile` |
+
+Never prefix it with `VITE_` and never commit it: anything `VITE_` is
+bundled into the browser. Without the key the assistant still builds a
+plan, using the built-in exercise picker instead of the AI, except for
+"Other" splits, which need the AI to read the description.
+
+`vite dev` doesn't serve `api/`; use `vercel dev` to try the assistant
+locally.
+
 ## 5. Copy the data out of Google Sheets
 
 `scripts/import-from-sheets.mjs` reads every tab through the still-running

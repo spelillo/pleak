@@ -1,3 +1,5 @@
+import type { AiPlanConfig } from "./planBuilder";
+
 // Data shapes for Pleak's data. Mirrors the Supabase tables in
 // supabase/migrations (snake_case there; src/lib/api.ts converts). Field
 // set is trimmed from the original LifeBud schema per the Phase 1 scope
@@ -127,6 +129,9 @@ export interface WeeklyWorkoutPlan {
   userId: string;
   name: string;
   isActive: boolean;
+  // Set when the plan was made with "Help build my plan"; drives the
+  // weekly refresh (see src/lib/planBuilder.ts).
+  aiConfig?: AiPlanConfig | null;
   createdAt: string;
   updatedAt: string;
 }
