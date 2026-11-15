@@ -25,6 +25,8 @@ const MUSCLE_GROUP_TO_TARGET: Record<string, PrimaryTarget> = {
   Quads: "Legs",
   Hamstrings: "Legs",
   Glutes: "Glutes",
+  Calves: "Legs",
+  Forearms: "Arms",
   Core: "Core",
 };
 
@@ -38,10 +40,12 @@ export interface WorkoutTypeOption {
   description: string;
   movementType?: MovementType;
   targets?: PrimaryTarget[];
-  // Minimum number of exercises to draw from each fine-grained muscle group,
-  // enforced by generateDraftExercises before the remaining slots are filled
-  // with a shuffled mix of anything else matching the split.
-  muscleRequirements?: Record<string, number>;
+  // The fine-grained muscle groups a day of this type is spread across,
+  // in priority order. generateDraftExercises splits the day's exercises
+  // between them as evenly as possible (see balanceQuotas), counting each
+  // exercise by its primary (first-listed) muscle group, so a Push day is
+  // never five chest movements.
+  balanceGroups?: string[];
 }
 
 // The five workout types offered on the setup screen. Push/Pull/Legs match
@@ -53,35 +57,35 @@ export const WORKOUT_TYPES: WorkoutTypeOption[] = [
     label: "Push",
     description: "Chest, shoulders, triceps",
     movementType: "Push",
-    muscleRequirements: { Chest: 1, Triceps: 1, Shoulders: 1 },
+    balanceGroups: ["Chest", "Shoulders", "Triceps"],
   },
   {
     id: "pull",
     label: "Pull",
     description: "Back, biceps",
     movementType: "Pull",
-    muscleRequirements: { Back: 2, Biceps: 2 },
+    balanceGroups: ["Back", "Biceps"],
   },
   {
     id: "legs",
     label: "Legs",
-    description: "Quads, hamstrings, glutes",
+    description: "Quads, hamstrings, calves",
     movementType: "Legs",
-    muscleRequirements: { Quads: 2, Hamstrings: 2 },
+    balanceGroups: ["Quads", "Hamstrings", "Calves"],
   },
   {
     id: "chest-back",
     label: "Chest/Back",
     description: "Upper body focus",
     targets: ["Chest", "Back"],
-    muscleRequirements: { Chest: 2, Back: 2 },
+    balanceGroups: ["Chest", "Back"],
   },
   {
     id: "arms",
     label: "Arms",
     description: "Biceps, triceps, shoulders",
     targets: ["Arms", "Shoulders"],
-    muscleRequirements: { Biceps: 1, Triceps: 1, Shoulders: 1 },
+    balanceGroups: ["Biceps", "Triceps", "Shoulders"],
   },
 ];
 
@@ -124,37 +128,128 @@ export function toWorkoutExercise(exercise: Exercise): WorkoutExercise {
   };
 }
 
+// Fine-grained groups for each broad target, used to balance custom split
+// days that are defined by targets rather than a preset type.
+const TARGET_TO_BALANCE_GROUPS: Record<PrimaryTarget, string[]> = {
+  Chest: ["Chest"],
+  Back: ["Back"],
+  Shoulders: ["Shoulders"],
+  Arms: ["Biceps", "Triceps"],
+  Legs: ["Quads", "Hamstrings", "Calves"],
+  Glutes: ["Glutes"],
+  Core: ["Core"],
+};
+
+const MOVEMENT_BALANCE_GROUPS: Record<MovementType, string[]> = {
+  Push: ["Chest", "Shoulders", "Triceps"],
+  Pull: ["Back", "Biceps"],
+  Legs: ["Quads", "Hamstrings", "Calves"],
+};
+
+export const MAX_EXERCISES_PER_DAY = 7;
+
+export function balanceGroupsFor(type: WorkoutTypeOption): string[] {
+  if (type.balanceGroups?.length) return type.balanceGroups;
+  if (type.movementType) return MOVEMENT_BALANCE_GROUPS[type.movementType];
+  return [...new Set((type.targets ?? []).flatMap((t) => TARGET_TO_BALANCE_GROUPS[t] ?? []))];
+}
+
+export function primaryMuscleGroup(exercise: Pick<Exercise, "muscleGroups">): string | undefined {
+  return exercise.muscleGroups[0];
+}
+
+/**
+ * How many exercises each group gets: as even as possible, with the
+ * leftovers going to the earlier (higher-priority) groups. 5 exercises
+ * over Chest/Shoulders/Triceps is 2/2/1; over Back/Biceps it's 3/2.
+ */
+export function balanceQuotas(groups: string[], count: number): Record<string, number> {
+  const quotas: Record<string, number> = {};
+  groups.forEach((g, i) => {
+    quotas[g] = Math.floor(count / groups.length) + (i < count % groups.length ? 1 : 0);
+  });
+  return quotas;
+}
+
+export function exerciseCountFor(type: WorkoutTypeOption, count: number = DEFAULT_EXERCISE_COUNT): number {
+  return Math.min(MAX_EXERCISES_PER_DAY, Math.max(count, balanceGroupsFor(type).length));
+}
+
+/**
+ * Picks a day's exercises from `pool` so they're spread across the type's
+ * balance groups per balanceQuotas. `preferred` (e.g. the AI's picks) is
+ * honored in order wherever it fits a group that still has room; every
+ * remaining slot is filled with a random exercise from whichever group is
+ * short. Only if a group has nothing left to give does a slot go to the
+ * least-used group, so the day still comes out full.
+ */
+export function pickBalancedExercises(
+  pool: Exercise[],
+  type: WorkoutTypeOption,
+  preferred: Exercise[] = [],
+  count: number = DEFAULT_EXERCISE_COUNT,
+): Exercise[] {
+  const matching = pool.filter((ex) => matchesWorkoutType(ex, type));
+  const groups = balanceGroupsFor(type);
+  const total = exerciseCountFor(type, count);
+  const quotas = balanceQuotas(groups, total);
+  const used: Record<string, number> = Object.fromEntries(groups.map((g) => [g, 0]));
+  const picked: Exercise[] = [];
+  const pickedIds = new Set<string>();
+  const take = (ex: Exercise) => {
+    picked.push(ex);
+    pickedIds.add(ex.id);
+    const g = primaryMuscleGroup(ex);
+    if (g && g in used) used[g]++;
+  };
+
+  for (const ex of preferred) {
+    if (picked.length >= total || pickedIds.has(ex.id) || !matchesWorkoutType(ex, type)) continue;
+    const g = primaryMuscleGroup(ex);
+    if (g && g in quotas && used[g] < quotas[g]) take(ex);
+  }
+
+  for (const g of groups) {
+    const candidates = shuffle(matching.filter((ex) => primaryMuscleGroup(ex) === g && !pickedIds.has(ex.id)));
+    for (const ex of candidates) {
+      if (used[g] >= quotas[g]) break;
+      take(ex);
+    }
+  }
+
+  // A group ran out of exercises: give its slots to the least-used groups
+  // that still have some, then to anything else matching the split.
+  while (picked.length < total) {
+    const byNeed = [...groups].sort((a, b) => used[a] - used[b]);
+    let added = false;
+    for (const g of byNeed) {
+      const ex = shuffle(matching.filter((e) => primaryMuscleGroup(e) === g && !pickedIds.has(e.id)))[0];
+      if (ex) {
+        take(ex);
+        added = true;
+        break;
+      }
+    }
+    if (!added) {
+      const ex = shuffle(matching.filter((e) => !pickedIds.has(e.id)))[0];
+      if (!ex) break;
+      take(ex);
+    }
+  }
+
+  // Grouped by muscle in priority order, compound-first order from the
+  // preferred list kept within each group.
+  return groups
+    .flatMap((g) => picked.filter((ex) => primaryMuscleGroup(ex) === g))
+    .concat(picked.filter((ex) => !groups.includes(primaryMuscleGroup(ex) ?? "")));
+}
+
 export function generateDraftExercises(
   pool: Exercise[],
   type: WorkoutTypeOption,
   count: number = DEFAULT_EXERCISE_COUNT,
 ): WorkoutExercise[] {
-  const matching = pool.filter((ex) => matchesWorkoutType(ex, type));
-  const requirements = type.muscleRequirements ?? {};
-  const requiredTotal = Object.values(requirements).reduce((sum, n) => sum + n, 0);
-  const targetCount = Math.max(count, requiredTotal);
-
-  const picked: Exercise[] = [];
-  const pickedIds = new Set<string>();
-
-  for (const [muscleGroup, minCount] of Object.entries(requirements)) {
-    const candidates = shuffle(matching.filter((ex) => ex.muscleGroups.includes(muscleGroup)));
-    for (const ex of candidates) {
-      if (picked.filter((p) => p.muscleGroups.includes(muscleGroup)).length >= minCount) break;
-      if (pickedIds.has(ex.id)) continue;
-      picked.push(ex);
-      pickedIds.add(ex.id);
-    }
-  }
-
-  const remaining = shuffle(matching.filter((ex) => !pickedIds.has(ex.id)));
-  for (const ex of remaining) {
-    if (picked.length >= targetCount) break;
-    picked.push(ex);
-    pickedIds.add(ex.id);
-  }
-
-  return shuffle(picked).map(toWorkoutExercise);
+  return pickBalancedExercises(pool, type, [], count).map(toWorkoutExercise);
 }
 
 export function estimateDurationMinutes(exercises: WorkoutExercise[]): number {

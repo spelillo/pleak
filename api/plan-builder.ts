@@ -116,7 +116,8 @@ interface Slot {
   dayOfWeek: number;
   splitLabel: string;
   focus: string;
-  muscleRequirements?: Record<string, number>;
+  // Exercises wanted per primary muscle group, e.g. { Chest: 2, Shoulders: 2, Triceps: 1 }.
+  balance?: Record<string, number>;
   candidates: { id: string; name: string; muscleGroups: string[]; equipment?: string }[];
 }
 
@@ -139,21 +140,31 @@ async function buildWeek(body: Record<string, unknown>) {
     return h;
   };
 
+  // Candidates are listed under their primary (first) muscle group, with
+  // the exact number to take from each, so the model can't fill a Push day
+  // with chest alone. The client enforces the same split on the answer.
   const dayBlocks = slots.map((slot) => {
-    const reqs = Object.entries(slot.muscleRequirements ?? {})
-      .map(([m, n]) => `at least ${n} ${m}`)
-      .join(", ");
-    const list = (slot.candidates ?? [])
-      .slice(0, 120)
-      .map((c) => `${handle(c.id)}: ${c.name} [${(c.muscleGroups ?? []).join(", ")}]${c.equipment ? ` (${c.equipment})` : ""}`)
-      .join("\n");
-    return `### dayOfWeek ${slot.dayOfWeek} (${DAY_NAMES[slot.dayOfWeek] ?? "?"}): ${slot.splitLabel}\nFocus: ${slot.focus}${reqs ? `\nCover: ${reqs}` : ""}\nCandidates:\n${list}`;
+    const balance = Object.entries(slot.balance ?? {}).filter(([, n]) => typeof n === "number" && n > 0);
+    const byGroup = new Map<string, Slot["candidates"]>();
+    for (const c of slot.candidates ?? []) {
+      const g = c.muscleGroups?.[0] ?? "Other";
+      byGroup.set(g, [...(byGroup.get(g) ?? []), c]);
+    }
+    const line = (c: Slot["candidates"][number]) =>
+      `${handle(c.id)}: ${c.name} [${(c.muscleGroups ?? []).join(", ")}]${c.equipment ? ` (${c.equipment})` : ""}`;
+    const sections = (balance.length ? balance.map(([g]) => g) : [...byGroup.keys()]).map((g) => {
+      const n = slot.balance?.[g];
+      const list = (byGroup.get(g) ?? []).slice(0, 30).map(line).join("\n");
+      return `${g}${n ? ` (pick exactly ${n})` : ""}:\n${list || "(none)"}`;
+    });
+    return `### dayOfWeek ${slot.dayOfWeek} (${DAY_NAMES[slot.dayOfWeek] ?? "?"}): ${slot.splitLabel}\nFocus: ${slot.focus}\n${sections.join("\n")}`;
   });
 
   const system = [
     "You are a strength coach building one week of a lifting plan.",
-    "The days and the split day for each are fixed. For each day, choose 5 exercises from THAT day's candidate list only, using the handles (e.g. \"e12\").",
-    "Start with a compound lift, then accessories. Balance the muscle groups listed under Cover. Don't use the same exercise twice in the week, and vary equipment.",
+    "The days and the split day for each are fixed. For each day, pick exercises from THAT day's candidate lists only, using the handles (e.g. \"e12\").",
+    "Each day's candidates are grouped by muscle group with an exact count, e.g. \"Chest (pick exactly 2)\". Take exactly that many from each group, so no single muscle group dominates the day.",
+    "Within the day, order them compound lifts first, then accessories. Don't use the same exercise twice in the week, and vary equipment.",
     "Give each day a short title (2 to 4 words, no day name, e.g. \"Heavy Chest\", \"Posterior Chain\").",
     "Write a 2 to 3 sentence summary for the user: how the week is laid out and why. Plain words, no em dashes.",
     'Reply with JSON only: {"summary": string, "days": [{"dayOfWeek": number, "title": string, "exercises": string[]}]}.',
