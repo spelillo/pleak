@@ -6,12 +6,16 @@ import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { PinPad } from "./PinPad";
 
 // sign-in: email + PIN. sign-up: name, email, PIN, then confirm (emailed
 // code). forgot: email, then reset-code (emailed code + new PIN). "reset" is
 // the older link-based path, where opening the link already signed them in.
+// The PIN itself is typed on a full-screen keypad (PinPad) after the form:
+// once to sign in, twice (enter + confirm) when choosing a new one.
 type Mode = "sign-in" | "sign-up" | "confirm" | "forgot" | "reset-code";
 type View = Mode | "reset";
+type PinStep = "enter" | "confirm";
 
 const PIN_LENGTH = 6;
 const CODE_LENGTH = 6;
@@ -33,17 +37,39 @@ function takeLinkError(): string | null {
 // Read at load, before anything else can rewrite the address.
 const initialLinkError = takeLinkError();
 
+// Remember who signed in last, so the next visit opens straight on the
+// keypad like a lock screen. Storage can be unavailable (private mode).
+const LAST_EMAIL_KEY = "pleak-last-email";
+function readLastEmail(): string {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+function saveLastEmail(email: string) {
+  try {
+    localStorage.setItem(LAST_EMAIL_KEY, email.trim());
+  } catch {
+    // Not remembering is fine.
+  }
+}
+
+function errorMessage(err: unknown) {
+  return err instanceof ApiError ? err.message : "Something went wrong. Check your connection and try again.";
+}
+
 const COPY: Record<View, { title: string; subtitle: string; submit: string; busy: string }> = {
   "sign-in": {
     title: "Sign in to Pleak",
     subtitle: "Log and track your workouts.",
-    submit: "Sign in",
+    submit: "Continue",
     busy: "Signing in…",
   },
   "sign-up": {
     title: "Create your account",
     subtitle: "Pleak is invite-only: use the email you were invited with.",
-    submit: "Create account",
+    submit: "Continue",
     busy: "Creating account…",
   },
   confirm: {
@@ -60,8 +86,8 @@ const COPY: Record<View, { title: string; subtitle: string; submit: string; busy
   },
   "reset-code": {
     title: "Choose a new PIN",
-    subtitle: "Open the link in the email, or type its code and a new PIN here.",
-    submit: "Save PIN",
+    subtitle: "Open the link in the email, or type its code here.",
+    submit: "Continue",
     busy: "Saving…",
   },
   reset: {
@@ -74,25 +100,33 @@ const COPY: Record<View, { title: string; subtitle: string; submit: string; busy
 
 const fieldClass = "bg-canvas! shadow-[var(--shadow-sm)]";
 const digitFieldClass = `${fieldClass} text-center text-lg font-semibold tracking-[0.5em] tabular-nums`;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function SignInGate() {
   const auth = useAuth();
   const { setupError, isRecoveringPassword } = auth;
   const [mode, setMode] = useState<Mode>("sign-in");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(readLastEmail);
   const [pin, setPin] = useState("");
+  const [firstPin, setFirstPin] = useState("");
   const [code, setCode] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialLinkError);
   const [notice, setNotice] = useState<string | null>(null);
+  // Returning users (and anyone without a link error to read) land on the pad.
+  const [pinStep, setPinStep] = useState<PinStep | null>(() =>
+    readLastEmail() && !initialLinkError ? "enter" : null,
+  );
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [shakeKey, setShakeKey] = useState(0);
 
   const view: View = isRecoveringPassword ? "reset" : mode;
   const copy = COPY[view];
   const needsEmail = view === "sign-in" || view === "sign-up" || view === "forgot";
   const needsCode = view === "confirm" || view === "reset-code";
-  const needsPin = view !== "forgot" && view !== "confirm";
-  const isNewPin = view !== "sign-in";
+  // A link-based reset has nothing to fill in but the new PIN.
+  const activePinStep: PinStep | null = view === "reset" ? (pinStep ?? "enter") : pinStep;
 
   function switchMode(next: Mode, keepMessages = false) {
     setMode(next);
@@ -101,7 +135,10 @@ export function SignInGate() {
       setNotice(null);
     }
     setPin("");
+    setFirstPin("");
     setCode("");
+    setPinStep(null);
+    setPinError(null);
   }
 
   async function run(action: () => Promise<void>) {
@@ -111,53 +148,112 @@ export function SignInGate() {
     try {
       await action();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Check your connection and try again.");
+      setError(errorMessage(err));
     } finally {
       setIsBusy(false);
     }
   }
 
+  function openPad(step: PinStep) {
+    setPin("");
+    setPinError(null);
+    setPinStep(step);
+  }
+
+  function closePad() {
+    setPin("");
+    setFirstPin("");
+    setPinError(null);
+    setPinStep(null);
+  }
+
+  function rejectPin(message: string) {
+    setPin("");
+    setPinError(message);
+    setShakeKey((k) => k + 1);
+  }
+
+  // The form collects everything except the PIN, then hands over to the pad.
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (needsPin && pin.length !== PIN_LENGTH) {
-      setError(`Your PIN is ${PIN_LENGTH} digits.`);
+    if (view === "sign-up" && !name.trim()) {
+      setError("Enter your name.");
+      return;
+    }
+    if (needsEmail && !EMAIL_PATTERN.test(email.trim())) {
+      setError("Enter a valid email address.");
       return;
     }
     if (needsCode && code.length !== CODE_LENGTH) {
       setError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
       return;
     }
+    if (view === "sign-in" || view === "sign-up" || view === "reset-code") {
+      setError(null);
+      openPad("enter");
+      return;
+    }
     void run(async () => {
-      if (view === "sign-in") {
-        try {
-          await auth.signIn(email, pin);
-        } catch (err) {
-          // Never confirmed: take them to the code screen instead of a dead end.
-          if (err instanceof ApiError && /confirm your email/i.test(err.message)) {
-            switchMode("confirm", true);
-            setNotice(`Confirm ${email.trim()} first using the email we sent. No email? Send a new one.`);
-            return;
-          }
-          throw err;
-        }
-      } else if (view === "sign-up") {
-        const result = await auth.signUp(name, email, pin);
-        if (result === "confirm-email") {
-          switchMode("confirm", true);
-          setNotice(`We sent a confirmation email to ${email.trim()}.`);
-        }
-      } else if (view === "confirm") {
+      if (view === "confirm") {
         await auth.confirmEmail(email, code);
       } else if (view === "forgot") {
         await auth.requestPasswordReset(email);
         switchMode("reset-code", true);
         setNotice(`If ${email.trim()} has an account, a reset email is on its way.`);
-      } else if (view === "reset-code") {
-        await auth.resetPin(email, code, pin);
-      } else {
-        await auth.completePasswordReset(pin);
       }
     });
+  }
+
+  async function handlePin(entered: string) {
+    // Choosing a new PIN: ask for it twice.
+    if (view !== "sign-in" && activePinStep === "enter") {
+      setFirstPin(entered);
+      openPad("confirm");
+      return;
+    }
+    if (view !== "sign-in" && entered !== firstPin) {
+      setFirstPin("");
+      setPinStep("enter");
+      rejectPin("PINs didn't match. Try again.");
+      return;
+    }
+
+    setPinError(null);
+    setIsBusy(true);
+    try {
+      if (view === "sign-in") {
+        await auth.signIn(email, entered);
+        saveLastEmail(email);
+      } else if (view === "sign-up") {
+        const result = await auth.signUp(name, email, entered);
+        saveLastEmail(email);
+        if (result === "confirm-email") {
+          switchMode("confirm", true);
+          setNotice(`We sent a confirmation email to ${email.trim()}.`);
+        }
+      } else if (view === "reset-code") {
+        await auth.resetPin(email, code, entered);
+        saveLastEmail(email);
+      } else {
+        await auth.completePasswordReset(entered);
+      }
+    } catch (err) {
+      // Never confirmed: take them to the code screen instead of a dead end.
+      if (view === "sign-in" && err instanceof ApiError && /confirm your email/i.test(err.message)) {
+        switchMode("confirm", true);
+        setNotice(`Confirm ${email.trim()} first using the email we sent. No email? Send a new one.`);
+      } else if (view === "sign-in" || view === "reset") {
+        // Wrong PIN: shake and let them try again on the pad.
+        rejectPin(errorMessage(err));
+      } else {
+        // Sign-up and code resets fail on the details in the form (email
+        // not invited, code expired), so go back there to fix them.
+        closePad();
+        setError(errorMessage(err));
+      }
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   function resendCode() {
@@ -166,6 +262,46 @@ export function SignInGate() {
       else await auth.requestPasswordReset(email);
       setNotice(`Sent a new email to ${email.trim()}.`);
     });
+  }
+
+  if (activePinStep) {
+    const isNew = view !== "sign-in";
+    return (
+      <PinPad
+        key={`${view}-${activePinStep}`}
+        title={isNew ? (activePinStep === "enter" ? "Choose a 6-digit PIN" : "Confirm your PIN") : "Enter your PIN"}
+        subtitle={
+          isNew
+            ? activePinStep === "enter"
+              ? "You'll use it to sign in."
+              : "Enter it again to make sure."
+            : email.trim()
+        }
+        length={PIN_LENGTH}
+        value={pin}
+        onChange={(next) => {
+          setPin(next);
+          if (pinError && next) setPinError(null);
+        }}
+        onComplete={(entered) => void handlePin(entered)}
+        error={setupError ?? pinError}
+        shakeKey={shakeKey}
+        busy={isBusy || !!setupError}
+        onBack={activePinStep === "confirm" ? () => openPad("enter") : view === "reset" ? undefined : closePad}
+        backLabel={view === "sign-in" ? "Email" : "Back"}
+        footer={
+          view === "sign-in" && (
+            <button
+              type="button"
+              onClick={() => switchMode("forgot")}
+              className="text-[15px] font-medium text-brand-blue transition-opacity active:opacity-50"
+            >
+              Forgot PIN?
+            </button>
+          )
+        }
+      />
+    );
   }
 
   return (
@@ -228,34 +364,6 @@ export function SignInGate() {
               />
             </div>
           )}
-          {needsPin && (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between px-1 text-xs font-medium text-muted">
-                <label htmlFor="pleak-pin">{isNewPin ? "New 6-digit PIN" : "PIN"}</label>
-                {view === "sign-in" && (
-                  <button
-                    type="button"
-                    onClick={() => switchMode("forgot")}
-                    className="font-medium text-brand-blue transition-opacity active:opacity-50"
-                  >
-                    Forgot PIN?
-                  </button>
-                )}
-              </div>
-              <Input
-                id="pleak-pin"
-                type="password"
-                value={pin}
-                onChange={(e) => setPin(digitsOnly(e.target.value, PIN_LENGTH))}
-                inputMode="numeric"
-                autoComplete={isNewPin ? "new-password" : "current-password"}
-                maxLength={PIN_LENGTH}
-                className={digitFieldClass}
-                required
-              />
-            </div>
-          )}
-
           <Button type="submit" variant="primary" className="mt-2 h-12 w-full text-base" disabled={isBusy || !!setupError}>
             {isBusy ? copy.busy : copy.submit}
           </Button>
