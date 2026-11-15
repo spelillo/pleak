@@ -25,7 +25,9 @@ import { ExercisePicker } from "@/components/workout/ExercisePicker";
 import { useExercises } from "@/lib/queries/exercises";
 import { useDeleteWorkoutSession, useUpdateWorkoutSession, useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import { useAuth } from "@/contexts/auth-context";
-import { REPS_INCREMENT, WEIGHT_INCREMENT, toWorkoutExercise } from "@/lib/workoutGeneration";
+import { WeightValue } from "@/components/ui/WeightValue";
+import { REPS_INCREMENT, toWorkoutExercise } from "@/lib/workoutGeneration";
+import { formatWeight, fromLb, otherUnit, toLb, weightIncrement } from "@/lib/units";
 import { getExercisePR } from "@/lib/personalRecords";
 import { cn } from "@/lib/cn";
 import type { WorkoutSummary } from "@/components/workout/WorkoutSummaryModal";
@@ -69,11 +71,13 @@ function Stepper({
   onStep,
   onChange,
   step,
+  decimal = false,
 }: {
   value: number | undefined;
   onStep: (delta: number) => void;
   onChange: (value: number | undefined) => void;
   step: number;
+  decimal?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -91,7 +95,8 @@ function Stepper({
       </motion.button>
       <input
         type="number"
-        inputMode="numeric"
+        inputMode={decimal ? "decimal" : "numeric"}
+        step={decimal ? "any" : undefined}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value ? Math.max(0, Number(e.target.value)) : undefined)}
         className="h-11 min-w-0 flex-1 tabular rounded-md border border-transparent bg-surface-card text-center text-xl font-semibold text-ink outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/15"
@@ -151,7 +156,7 @@ function CompletedSetRow({ set, index, isCardio }: { set: WorkoutSet; index: num
             <>
               <div className="flex justify-between">
                 <span className="text-muted">Weight:</span>
-                <span className="text-ink">{set.weight ?? 0} lbs</span>
+                <WeightValue lb={set.weight ?? 0} className="text-ink" />
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">Reps:</span>
@@ -176,7 +181,7 @@ export function ActiveWorkout({
   onFinished: (summary: WorkoutSummary) => void;
   onSaveError: (message: string) => void;
 }) {
-  const { user } = useAuth();
+  const { user, weightUnit } = useAuth();
   const { data: library } = useExercises();
   const { data: pastSessions } = useWorkoutSessions(userId);
   const updateSession = useUpdateWorkoutSession(userId);
@@ -292,6 +297,9 @@ export function ActiveWorkout({
     );
   }
 
+  // Weights are stored in pounds; the stepper works in the preferred unit
+  // (2.5 kg or 5 lb plates), stepping from the value as shown so kg
+  // entries don't drift.
   function stepCurrentWeight(delta: number) {
     setExercises((prev) =>
       prev.map((ex, i) =>
@@ -299,9 +307,11 @@ export function ActiveWorkout({
           ? ex
           : {
               ...ex,
-              sets: ex.sets.map((s, si) =>
-                si !== currentSetIndex ? s : { ...s, weight: Math.max(0, (s.weight ?? 0) + delta) },
-              ),
+              sets: ex.sets.map((s, si) => {
+                if (si !== currentSetIndex) return s;
+                const shown = s.weight != null ? fromLb(s.weight, weightUnit) : 0;
+                return { ...s, weight: toLb(Math.max(0, shown + delta), weightUnit) };
+              }),
             },
       ),
     );
@@ -556,7 +566,7 @@ export function ActiveWorkout({
                     {!isCardio && hasPR && (
                       <span className="flex items-center gap-1 text-xs font-medium text-muted">
                         <Trophy size={14} weight="fill" className="text-brand-gold" />
-                        PR: {currentPR} lb
+                        PR: <WeightValue lb={currentPR} />
                       </span>
                     )}
                   </div>
@@ -589,12 +599,20 @@ export function ActiveWorkout({
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="mb-1.5 text-xs text-muted">Weight (lbs)</p>
+                        <p className="mb-1.5 flex items-baseline justify-between gap-2 text-xs text-muted">
+                          <span>Weight ({weightUnit})</span>
+                          {currentSet.weight != null && (
+                            <span className="tabular text-[0.7rem]">
+                              {formatWeight(currentSet.weight, otherUnit(weightUnit))}
+                            </span>
+                          )}
+                        </p>
                         <Stepper
-                          value={currentSet.weight}
+                          value={currentSet.weight != null ? fromLb(currentSet.weight, weightUnit) : undefined}
                           onStep={stepCurrentWeight}
-                          onChange={(v) => updateCurrentSet({ weight: v })}
-                          step={WEIGHT_INCREMENT}
+                          onChange={(v) => updateCurrentSet({ weight: v == null ? undefined : toLb(v, weightUnit) })}
+                          step={weightIncrement(weightUnit)}
+                          decimal
                         />
                         {bodyweight != null && (
                           <button
@@ -602,7 +620,10 @@ export function ActiveWorkout({
                             onClick={fillBodyweight}
                             className="mt-2 text-xs font-medium text-brand-blue hover:underline"
                           >
-                            BW ({bodyweight} lbs)
+                            BW ({formatWeight(bodyweight, weightUnit)})
+                            <span className="ml-1 font-normal text-muted">
+                              {formatWeight(bodyweight, otherUnit(weightUnit))}
+                            </span>
                           </button>
                         )}
                       </div>

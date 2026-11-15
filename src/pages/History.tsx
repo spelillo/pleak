@@ -14,7 +14,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { PillTabs } from "@/components/ui/PillTabs";
 import { useWorkoutSessions } from "@/lib/queries/workoutSessions";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth, useWeightUnit } from "@/contexts/auth-context";
+import { formatWeight } from "@/lib/units";
 import { ApiError } from "@/lib/api";
 import { computePersonalRecords } from "@/lib/personalRecords";
 import type { WorkoutSession } from "@/lib/types";
@@ -24,6 +25,7 @@ function formatDate(iso: string) {
 }
 
 function SessionCard({ session, isOpen, onToggle }: { session: WorkoutSession; isOpen: boolean; onToggle: () => void }) {
+  const weightUnit = useWeightUnit();
   const setsCompleted = session.exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
   const totalSets = session.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
 
@@ -64,7 +66,7 @@ function SessionCard({ session, isOpen, onToggle }: { session: WorkoutSession; i
                     ) : (
                       <span>
                         {set.reps != null ? `${set.reps} reps` : "—"}
-                        {set.weight != null && ` · ${set.weight} lb`}
+                        {set.weight != null && ` · ${formatWeight(set.weight, weightUnit)}`}
                       </span>
                     )}
                     <span className={set.completed ? "text-brand-blue" : ""}>
@@ -82,6 +84,7 @@ function SessionCard({ session, isOpen, onToggle }: { session: WorkoutSession; i
 }
 
 function PRList({ sessions }: { sessions: WorkoutSession[] }) {
+  const weightUnit = useWeightUnit();
   const [query, setQuery] = useState("");
   const records = useMemo(() => computePersonalRecords(sessions), [sessions]);
   const filtered = records.filter((pr) => pr.exerciseName.toLowerCase().includes(query.trim().toLowerCase()));
@@ -115,7 +118,7 @@ function PRList({ sessions }: { sessions: WorkoutSession[] }) {
                 <p className="text-sm font-medium text-ink">{pr.exerciseName}</p>
                 <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-ink">
                   <Trophy size={16} weight="fill" className="text-brand-gold" />
-                  {pr.weight} lb
+                  {formatWeight(pr.weight, weightUnit)}
                 </span>
               </Card>
             </li>

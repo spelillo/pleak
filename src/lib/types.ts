@@ -12,7 +12,8 @@ export interface User {
   dateOfBirth?: string;
   sex?: "M" | "F";
   height?: number;
-  weight?: number;
+  weight?: number; // body weight, always stored in pounds
+  weightUnit?: "lb" | "kg"; // how weights are shown and typed; defaults to lb
   age?: number;
   streak?: number;
   createdAt: string;

@@ -1,6 +1,7 @@
 import { CheckCircle, Trophy } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { WeightValue } from "@/components/ui/WeightValue";
 import type { WorkoutExercise } from "@/lib/types";
 
 export interface WorkoutSummary {
@@ -29,7 +30,7 @@ function ExerciseSummaryRow({ exercise }: { exercise: WorkoutExercise }) {
                 </span>
               ) : (
                 <span>
-                  {set.weight ?? 0} lbs × {set.reps ?? 0} reps
+                  <WeightValue lb={set.weight ?? 0} className="text-ink/80" /> × {set.reps ?? 0} reps
                 </span>
               )}
             </li>
