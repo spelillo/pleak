@@ -6,13 +6,18 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
 import { EXERCISE_NAME_MAX_LENGTH, normalizeExerciseName, validateExerciseName } from "@/lib/exerciseName";
+import { findSimilarExercise } from "@/lib/exerciseMatch";
 import { MUSCLE_GROUPS } from "@/lib/muscleGroups";
 import { useCreateExercise, useExercises } from "@/lib/queries/exercises";
 import { MOVEMENT_TYPES, type MovementType } from "@/lib/workoutGeneration";
 import type { Exercise } from "@/lib/types";
 
 interface CreateExerciseModalProps {
-  /** Called with the saved exercise; the modal does not close itself. */
+  /**
+   * Called with the saved exercise, or with the existing library exercise
+   * the user picked from "Did you mean…?" instead. The modal does not close
+   * itself.
+   */
   onCreated: (exercise: Exercise) => void;
   onClose: () => void;
   /** Prefills the name, e.g. with what the user was searching for. */
@@ -62,6 +67,10 @@ export function CreateExerciseModal({ onCreated, onClose, initialName = "" }: Cr
   const [nameTouched, setNameTouched] = useState(false);
   const [muscleGroups, setMuscleGroups] = useState<string[]>([]);
   const [movementType, setMovementType] = useState<MovementType | "">("");
+  const [isChecking, setIsChecking] = useState(false);
+  const [suggestion, setSuggestion] = useState<Exercise | null>(null);
+  // The name the user already said "create anyway" for, so we don't ask twice.
+  const [confirmedName, setConfirmedName] = useState<string | null>(null);
 
   // The fixed list, plus anything else the library already uses.
   const muscleOptions = useMemo(() => {
@@ -91,16 +100,37 @@ export function CreateExerciseModal({ onCreated, onClose, initialName = "" }: Cr
     onClose();
   }
 
+  function selectedMuscles() {
+    // Keep the list's order rather than the order they were tapped in.
+    return muscleOptions.filter((mg) => muscleGroups.includes(mg));
+  }
+
   async function handleSave() {
     setNameTouched(true);
-    if (!canSave) return;
+    if (!canSave || isChecking) return;
+    if (confirmedName !== normalizedName.toLowerCase()) {
+      setIsChecking(true);
+      const similar = await findSimilarExercise(
+        { name: normalizedName, muscleGroups: selectedMuscles(), movementType },
+        exercises ?? [],
+      );
+      setIsChecking(false);
+      if (similar) {
+        setSuggestion(similar);
+        return;
+      }
+    }
+    await save();
+  }
+
+  async function save() {
+    if (movementType === "") return;
     try {
       const created = await createExercise.mutateAsync({
         name: normalizedName,
         category: "weightlifting",
         exerciseType: "weights",
-        // Keep the list's order rather than the order they were tapped in.
-        muscleGroups: muscleOptions.filter((mg) => muscleGroups.includes(mg)),
+        muscleGroups: selectedMuscles(),
         movementType,
       });
       onCreated(created);
@@ -204,12 +234,60 @@ export function CreateExerciseModal({ onCreated, onClose, initialName = "" }: Cr
           {createExercise.error && (
             <p className="mb-2 text-xs text-error">Couldn't save the exercise. Check your connection and try again.</p>
           )}
-          <Button type="submit" variant="primary" className="w-full" disabled={!canSave || createExercise.isPending}>
-            {createExercise.isPending ? "Saving…" : "Save exercise"}
+          <Button
+            type="submit"
+            variant="primary"
+            className="w-full"
+            disabled={!canSave || isChecking || createExercise.isPending}
+          >
+            {isChecking ? "Checking the library…" : createExercise.isPending ? "Saving…" : "Save exercise"}
           </Button>
         </div>
       </form>
     </Modal>
+
+    {suggestion && (
+      <Modal onClose={() => setSuggestion(null)} ariaLabel="Similar exercise found" className="max-w-sm">
+        <div className="px-5 pb-2 pt-6 text-center">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Already in the library</p>
+          <p className="mt-1 text-lg font-semibold text-ink">Did you mean {suggestion.name}?</p>
+          <p className="mt-1 text-sm text-muted">
+            {[suggestion.muscleGroups.join(", "), suggestion.movementType].filter(Boolean).join(" · ")}
+          </p>
+          <p className="mt-3 text-sm text-body">
+            It looks like the same movement as “{normalizedName}”. Use it to keep your history in one place.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 p-4">
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={() => {
+              const existing = suggestion;
+              setSuggestion(null);
+              onCreated(existing);
+            }}
+          >
+            Use {suggestion.name}
+          </Button>
+          <Button
+            variant="secondary"
+            className="w-full"
+            disabled={createExercise.isPending}
+            onClick={() => {
+              setConfirmedName(normalizedName.toLowerCase());
+              setSuggestion(null);
+              void save();
+            }}
+          >
+            No, create “{normalizedName}”
+          </Button>
+          <Button variant="text" className="mt-1 w-full justify-center" onClick={() => setSuggestion(null)}>
+            Go back and edit
+          </Button>
+        </div>
+      </Modal>
+    )}
     </div>,
     document.body,
   );
