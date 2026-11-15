@@ -10,6 +10,21 @@ function requireConfig() {
   }
 }
 
+// Supabase Auth's English error strings, reworded for the sign-in screen.
+function friendlyAuthError(message: string): string {
+  if (/invalid login credentials/i.test(message)) return "That email and password don't match.";
+  if (/email not confirmed/i.test(message)) {
+    return "Confirm your email first: open the link we sent you, then sign in.";
+  }
+  if (/already registered|already been registered/i.test(message)) {
+    return "There's already an account with that email. Sign in instead.";
+  }
+  if (/password should be at least/i.test(message)) return "Use a password of at least 8 characters.";
+  if (/rate limit|too many/i.test(message)) return "Too many attempts. Wait a minute and try again.";
+  if (/signups not allowed|signup.*disabled/i.test(message)) return "New sign-ups are turned off.";
+  return message;
+}
+
 /**
  * Fetches (or creates, on first sign-in) the signed-in person's Pleak user
  * row. The pleak_login() database function checks the email allowlist and
@@ -25,33 +40,67 @@ export async function fetchAppUser(): Promise<User> {
         "The database isn't set up yet. Run supabase/migrations/20261014000000_initial_schema.sql in the Supabase SQL editor.",
       );
     }
+    // The database's allowlist error predates email sign-in and says "Google account".
+    if (/not allowed to sign in/i.test(error.message)) {
+      throw new ApiError("That email isn't on Pleak's invite list yet.");
+    }
     throw new ApiError(error.message);
   }
   return rowToRecord<User>(data as Record<string, unknown>);
 }
 
-/**
- * Exchanges a Google Identity Services ID token for a Supabase session, then
- * loads the app user. `nonce` is the raw nonce whose SHA-256 was handed to
- * Google when the sign-in button was initialized.
- */
-export async function loginWithGoogle(idToken: string, nonce: string): Promise<User> {
-  requireConfig();
-  const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken, nonce });
-  if (error) {
-    if (/provider.*(not enabled|unsupported)|unsupported provider/i.test(error.message)) {
-      throw new ApiError("Google sign-in isn't turned on in Supabase yet (Authentication → Providers → Google).");
-    }
-    throw new ApiError(error.message);
-  }
+// After Supabase Auth accepts the person, load their Pleak row. If that
+// fails (not on the allowlist, say), don't leave a half-signed-in session.
+async function loadAppUserOrSignOut(): Promise<User> {
   try {
     return await fetchAppUser();
   } catch (err) {
-    // Not on the allowlist (or the profile lookup failed): don't leave a
-    // half-signed-in Supabase session behind.
     await supabase.auth.signOut();
     throw err;
   }
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<User> {
+  requireConfig();
+  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+  if (error) throw new ApiError(friendlyAuthError(error.message));
+  return loadAppUserOrSignOut();
+}
+
+/**
+ * Creates an account. Returns the user when Supabase signs them straight in,
+ * or null when it first wants the email confirmed (the default setting).
+ */
+export async function signUpWithPassword(name: string, email: string, password: string): Promise<User | null> {
+  requireConfig();
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: { data: { full_name: name.trim() }, emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
+  });
+  if (error) throw new ApiError(friendlyAuthError(error.message));
+  // With confirmations on, signing up an email that already has an account
+  // returns a user with no identities instead of an error.
+  if (data.user && data.user.identities?.length === 0) {
+    throw new ApiError("There's already an account with that email. Sign in instead.");
+  }
+  if (!data.session) return null;
+  return loadAppUserOrSignOut();
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  requireConfig();
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: window.location.origin + import.meta.env.BASE_URL,
+  });
+  if (error) throw new ApiError(friendlyAuthError(error.message));
+}
+
+export async function setNewPassword(password: string): Promise<User> {
+  requireConfig();
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new ApiError(friendlyAuthError(error.message));
+  return loadAppUserOrSignOut();
 }
 
 export async function signOutOfSupabase(): Promise<void> {

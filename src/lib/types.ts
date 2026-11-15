@@ -6,7 +6,7 @@
 
 export interface User {
   id: string;
-  googleId: string;
+  googleId?: string | null; // set for accounts that first signed in with Google
   email: string;
   displayName: string;
   dateOfBirth?: string;
