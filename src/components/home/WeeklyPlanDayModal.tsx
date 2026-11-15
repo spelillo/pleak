@@ -284,6 +284,7 @@ export function WeeklyPlanDayModal({
                   }}
                   placeholder="Search exercises to add…"
                   autoFocus
+                  allowCreate
                 />
               </div>
             )}

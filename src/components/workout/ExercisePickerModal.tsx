@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { CreateExerciseModal } from "@/components/workout/CreateExerciseModal";
 import { cn } from "@/lib/cn";
 import { MOVEMENT_TYPES } from "@/lib/workoutGeneration";
 import type { Exercise } from "@/lib/types";
@@ -12,6 +13,8 @@ interface ExercisePickerModalProps {
   onSelect: (exercise: Exercise) => void;
   onClose: () => void;
   title?: string;
+  /** Shows a "Create exercise" row; a newly created exercise is selected. */
+  allowCreate?: boolean;
 }
 
 const TYPE_OPTIONS = [
@@ -68,8 +71,9 @@ function FilterRow<T extends string>({
   );
 }
 
-export function ExercisePickerModal({ exercises, onSelect, onClose, title }: ExercisePickerModalProps) {
+export function ExercisePickerModal({ exercises, onSelect, onClose, title, allowCreate }: ExercisePickerModalProps) {
   const [query, setQuery] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [movementFilter, setMovementFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -132,6 +136,16 @@ export function ExercisePickerModal({ exercises, onSelect, onClose, title }: Exe
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {allowCreate && (
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="flex w-full items-center gap-2 border-b border-hairline px-4 py-3 text-left text-sm font-semibold text-brand-blue transition-colors hover:bg-surface-card active:bg-surface-strong"
+          >
+            <Plus size={16} weight="bold" />
+            {query.trim() && matches.length === 0 ? `Create “${query.trim()}”` : "Create exercise"}
+          </button>
+        )}
         {matches.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted">No matching exercises.</p>
         ) : (
@@ -156,6 +170,17 @@ export function ExercisePickerModal({ exercises, onSelect, onClose, title }: Exe
           </ul>
         )}
       </div>
+
+      {showCreate && (
+        <CreateExerciseModal
+          initialName={matches.length === 0 ? query.trim() : ""}
+          onCreated={(ex) => {
+            setShowCreate(false);
+            onSelect(ex);
+          }}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
     </Modal>
   );
 }

@@ -190,6 +190,7 @@ export function WorkoutDraftModal({
       <ExercisePickerModal
         exercises={availableToAdd}
         title="Add exercise"
+        allowCreate
         onSelect={(ex) => {
           onAddExercise(ex);
           setShowPicker(false);

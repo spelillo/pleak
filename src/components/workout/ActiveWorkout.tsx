@@ -678,7 +678,7 @@ export function ActiveWorkout({
               <X size={18} />
             </button>
           </div>
-          <ExercisePicker exercises={availableToAdd} onSelect={addExerciseToWorkout} />
+          <ExercisePicker exercises={availableToAdd} onSelect={addExerciseToWorkout} allowCreate autoFocus />
         </Modal>
       )}
 
