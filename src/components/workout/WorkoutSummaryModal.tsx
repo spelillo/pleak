@@ -55,7 +55,7 @@ export function WorkoutSummaryModal({ summary, onClose }: { summary: WorkoutSumm
           </p>
         </div>
 
-        <div className="mb-6 max-h-[45vh] overflow-y-auto rounded-lg border border-hairline px-3.5">
+        <div className="mb-6 max-h-[45vh] overflow-y-auto rounded-md bg-surface-soft px-4">
           {summary.exercises.map((exercise, i) => (
             <ExerciseSummaryRow key={i} exercise={exercise} />
           ))}

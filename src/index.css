@@ -1,82 +1,163 @@
 @import "tailwindcss";
 
+/* index.html always sets .dark or .light on <html>, so dark: follows the
+   in-app theme choice rather than only the system setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Pleak design tokens, modeled on Apple's Human Interface Guidelines and
+ * translated for the web (see docs/design-guidelines.md):
+ * - system font first (SF Pro on Apple devices), with size-specific tracking
+ * - grouped layout: content cards (canvas) sit on a slightly darker page
+ * - translucent materials for floating chrome (tab bar, header, sheets)
+ * - one tint (UCLA Blue) for everything interactive; gold stays a highlight
+ */
 @theme {
   /* Brand */
   --color-brand-blue: #2774ae;
   --color-brand-gold: #ffd100;
 
-  /* Primary / ink */
-  --color-primary: #111111;
-  --color-primary-active: #242424;
-  --color-primary-disabled: #e5e7eb;
-  --color-ink: #111111;
+  /* Primary: the tint as a filled surface (white text passes AA at 4.9:1) */
+  --color-primary: #2774ae;
+  --color-primary-active: #1f5f90;
+  --color-primary-disabled: rgb(118 118 128 / 0.2);
+  --color-ink: #000000;
 
-  /* Text */
-  --color-body: #374151;
-  --color-muted: #6b7280;
-  --color-muted-soft: #898989;
+  /* Text (iOS label / secondaryLabel, tuned to pass AA on every surface) */
+  --color-body: #1d1d1f;
+  --color-muted: #6e6e73;
+  --color-muted-soft: #8e8e93;
 
-  /* Lines */
-  --color-hairline: #e5e7eb;
-  --color-hairline-soft: #f3f4f6;
+  /* Separators */
+  --color-hairline: rgb(60 60 67 / 0.16);
+  --color-hairline-soft: rgb(60 60 67 / 0.08);
 
-  /* Surfaces */
+  /* Surfaces: page is the grouped background, canvas is a card on it,
+     the fills are translucent so they work on either. */
+  --color-page: #f2f2f7;
   --color-canvas: #ffffff;
-  --color-surface-soft: #f8f9fa;
-  --color-surface-card: #f5f5f5;
-  --color-surface-strong: #e5e7eb;
-  --color-surface-dark: #101010;
-  --color-surface-dark-elevated: #1a1a1a;
+  --color-surface-soft: rgb(118 118 128 / 0.08);
+  --color-surface-card: rgb(118 118 128 / 0.12);
+  --color-surface-strong: rgb(118 118 128 / 0.2);
+  --color-surface-dark: #000000;
+  --color-surface-dark-elevated: #1c1c1e;
 
   /* On-color text */
   --color-on-primary: #ffffff;
   --color-on-dark: #ffffff;
-  --color-on-dark-soft: #a1a1aa;
+  --color-on-dark-soft: #a1a1a6;
 
-  /* Semantic */
-  --color-success: #10b981;
+  /* Semantic (iOS system colors) */
+  --color-success: #248a3d;
   --color-warning: #ffd100;
-  --color-error: #ef4444;
+  --color-error: #d70015;
 
-  /* Type */
+  /* Type: the platform font first. SF Pro ships optical sizes and
+     tracking tables, so Apple devices get it for free; Inter is the
+     closest match everywhere else. */
   --font-sans:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
   --font-display:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
 
-  /* Radius */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Text sizes follow iOS text styles: footnote 13, subheadline 15,
+     body 17, title3 20, title2 22, title1 28. Spacing is in rem, so the
+     layout scales with the reader's font size. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.3;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.35;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.3;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.25;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.2;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 1.15;
+
+  /* Radius: continuous-feeling, concentric corners. Controls 12px, cards
+     20px, sheets 28px; pills and circles for chips and icon buttons. */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-pill: 9999px;
 
-  /* Spacing: the default 4px-based scale (p-1=4px … p-12=48px) already
-     matches the design system's xxs–xxl steps, so only the one-off
-     section rhythm value needs its own named token. */
   --spacing-section: 96px;
 
-  /* Elevation: soft, low-opacity shadows for surfaces that should read as
-     resting above the page (vs. inset/recessed surfaces, which stay flat). */
-  --shadow-color: 17 17 17;
-  --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.04), 0 1px 1px rgb(var(--shadow-color) / 0.03);
-  --shadow-md: 0 4px 12px rgb(var(--shadow-color) / 0.06), 0 1px 2px rgb(var(--shadow-color) / 0.04);
-  --shadow-lg: 0 12px 32px rgb(var(--shadow-color) / 0.12), 0 2px 6px rgb(var(--shadow-color) / 0.06);
+  /* Elevation: cards on the grouped page barely lift; floating chrome
+     (bigger, "thicker" material) gets a deeper, softer shadow. */
+  --shadow-color: 0 0 0;
+  --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.04);
+  --shadow-md: 0 4px 16px rgb(var(--shadow-color) / 0.06), 0 1px 3px rgb(var(--shadow-color) / 0.04);
+  --shadow-lg: 0 16px 48px rgb(var(--shadow-color) / 0.14), 0 2px 8px rgb(var(--shadow-color) / 0.06);
+
+  --animate-materialize: materialize 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes materialize {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: scale(0.98);
+  }
 }
 
 :root {
   color-scheme: light dark;
+  /* Material tints for the translucent layers. */
+  --material-bar: rgb(249 249 249 / 0.72);
+  --material-sheet: rgb(255 255 255 / 0.86);
+  --material-edge: rgb(255 255 255 / 0.5);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
-  background: var(--color-canvas);
+  background: var(--color-page);
   color: var(--color-body);
   font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.47;
+  letter-spacing: -0.01em;
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Ease the switch between light and dark instead of a hard flash. */
+  transition: background-color 300ms ease;
+}
+
+/* Size-specific tracking: small text opens up, large text tightens. */
+.text-xs,
+.text-\[11px\],
+.text-\[10px\] {
+  letter-spacing: 0;
+}
+.text-lg,
+.text-xl {
+  letter-spacing: -0.017em;
+}
+.text-2xl,
+.text-3xl {
+  letter-spacing: -0.021em;
+}
+
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-brand-blue) 50%, transparent);
+  outline-offset: 2px;
 }
 
 .font-display {
@@ -84,87 +165,185 @@ body {
   font-weight: 600;
 }
 
-/* Cal Sans substitute: Inter 600 with negative tracking per design spec */
+/* iOS Large Title and display sizes: tight leading, negative tracking. */
 .display-xl {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 64px;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6vw, 4rem);
   line-height: 1.05;
-  letter-spacing: -2px;
+  letter-spacing: -0.03em;
 }
 .display-lg {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 48px;
-  line-height: 1.1;
-  letter-spacing: -1.5px;
+  font-weight: 700;
+  font-size: clamp(2.25rem, 5vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.028em;
 }
 .display-md {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 36px;
-  line-height: 1.15;
-  letter-spacing: -1px;
+  font-weight: 700;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 .display-sm {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 28px;
-  line-height: 1.2;
-  letter-spacing: -0.5px;
+  font-weight: 700;
+  font-size: 2.125rem;
+  line-height: 1.12;
+  letter-spacing: -0.022em;
 }
 
-/* Small chrome labels (nav, pills, badges) read better with a touch of
+/* Grouped-list section title (iOS title3, semibold). */
+.section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.017em;
+  color: var(--color-ink);
+}
+
+/* Small chrome labels (tab bar, chips) read better with a hair of
    positive tracking, mirroring the negative tracking on display type. */
 .label-tracked {
   letter-spacing: 0.01em;
 }
 
-/* Dark mode: CSS-variable strategy (Section 8.A), toggled by a `.dark` /
-   `.light` class on <html> (see ThemeProvider). Primary flips from
-   black-on-white to white-on-black so the CTA keeps AA contrast against
-   the dark canvas rather than disappearing into it. */
-:root.dark {
-  --color-canvas: #101010;
-  --color-ink: #ffffff;
-  --color-body: #d1d5db;
-  --color-muted: #a1a1aa;
-  --color-muted-soft: #71717a;
-  --color-surface-card: #1a1a1a;
-  --color-surface-soft: #18181b;
-  --color-surface-strong: #27272a;
-  --color-hairline: #27272a;
-  --color-hairline-soft: #1f1f23;
-  --color-primary: #ffffff;
-  --color-primary-active: #e5e7eb;
-  --color-primary-disabled: #3f3f46;
-  --color-on-primary: #111111;
-
-  /* Shadows need more contrast against a dark canvas to read as elevation. */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 1px rgb(0 0 0 / 0.2);
-  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.36), 0 1px 2px rgb(0 0 0 / 0.24);
-  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+/* Tabular figures for anything counting (timers, weights, reps). */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-/* System fallback only when the user hasn't explicitly chosen a mode. */
+/* Translucent materials. Bars are a "thicker" material with a bright top
+   edge (light catching the glass); sheets are lighter and sit on a scrim. */
+.material-bar {
+  background: var(--material-bar);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 0.5px 0 var(--material-edge),
+    0 0 0 0.5px var(--color-hairline),
+    var(--shadow-lg);
+}
+.material-sheet {
+  background: var(--material-sheet);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
+}
+.material-header {
+  background: var(--material-bar);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* Sheets on phones are grabbed by their top strip (the grabber and the
+   title row), so that strip opts out of browser panning. Scrolling lists
+   further down are their own scroll containers and still pan. */
+@media (max-width: 767px) {
+  [data-sheet] > :nth-child(2) {
+    touch-action: none;
+  }
+}
+
+/* Dark mode: CSS-variable strategy, toggled by a `.dark` / `.light` class
+   on <html> (see ThemeProvider), with the system setting as the fallback.
+   The page goes true black and cards lift to #1c1c1e, as on iOS. */
+:root.dark {
+  --color-brand-blue: #6cb0ea;
+  --color-primary: #2a7fbe;
+  --color-primary-active: #3a8fcf;
+  --color-ink: #ffffff;
+  --color-body: #f5f5f7;
+  --color-muted: #98989f;
+  --color-muted-soft: #6e6e73;
+  --color-hairline: rgb(84 84 88 / 0.6);
+  --color-hairline-soft: rgb(84 84 88 / 0.34);
+  --color-page: #000000;
+  --color-canvas: #1c1c1e;
+  --color-surface-soft: rgb(118 118 128 / 0.16);
+  --color-surface-card: rgb(118 118 128 / 0.24);
+  --color-surface-strong: rgb(118 118 128 / 0.32);
+  --color-primary-disabled: rgb(118 118 128 / 0.32);
+  --color-on-primary: #ffffff;
+  --color-success: #30d158;
+  --color-error: #ff453a;
+  --material-bar: rgb(30 30 30 / 0.72);
+  --material-sheet: rgb(36 36 38 / 0.86);
+  --material-edge: rgb(255 255 255 / 0.12);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
-    --color-canvas: #101010;
+    --color-brand-blue: #6cb0ea;
+    --color-primary: #2a7fbe;
+    --color-primary-active: #3a8fcf;
     --color-ink: #ffffff;
-    --color-body: #d1d5db;
-    --color-muted: #a1a1aa;
-    --color-muted-soft: #71717a;
-    --color-surface-card: #1a1a1a;
-    --color-surface-soft: #18181b;
-    --color-surface-strong: #27272a;
-    --color-hairline: #27272a;
-    --color-hairline-soft: #1f1f23;
-    --color-primary: #ffffff;
-    --color-primary-active: #e5e7eb;
-    --color-primary-disabled: #3f3f46;
-    --color-on-primary: #111111;
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 1px rgb(0 0 0 / 0.2);
-    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.36), 0 1px 2px rgb(0 0 0 / 0.24);
-    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+    --color-body: #f5f5f7;
+    --color-muted: #98989f;
+    --color-muted-soft: #6e6e73;
+    --color-hairline: rgb(84 84 88 / 0.6);
+    --color-hairline-soft: rgb(84 84 88 / 0.34);
+    --color-page: #000000;
+    --color-canvas: #1c1c1e;
+    --color-surface-soft: rgb(118 118 128 / 0.16);
+    --color-surface-card: rgb(118 118 128 / 0.24);
+    --color-surface-strong: rgb(118 118 128 / 0.32);
+    --color-primary-disabled: rgb(118 118 128 / 0.32);
+    --color-on-primary: #ffffff;
+    --color-success: #30d158;
+    --color-error: #ff453a;
+    --material-bar: rgb(30 30 30 / 0.72);
+    --material-sheet: rgb(36 36 38 / 0.86);
+    --material-edge: rgb(255 255 255 / 0.12);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+}
+
+/* Accessibility: solid surfaces when transparency is reduced, defined
+   edges when more contrast is asked for, cross-fades instead of motion. */
+@media (prefers-reduced-transparency: reduce) {
+  .material-bar,
+  .material-sheet,
+  .material-header {
+    background: var(--color-canvas);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root {
+    --color-muted: #48484a;
+    --color-hairline: rgb(60 60 67 / 0.5);
+  }
+  :root.dark {
+    --color-muted: #c7c7cc;
+    --color-hairline: rgb(235 235 245 / 0.5);
+  }
+  .material-bar,
+  .material-sheet,
+  .material-header {
+    background: var(--color-canvas);
+    box-shadow: 0 0 0 1px var(--color-hairline);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+  .animate-materialize {
+    animation: fade-in 200ms ease;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
 }

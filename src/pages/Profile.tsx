@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import { formatDuration, minutesByDayThisWeek, totalVolume } from "@/lib/workoutStats";
 import { addDays, startOfWeek } from "@/lib/weekPlanning";
-import { cn } from "@/lib/cn";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const themeOptions = [
   { value: "light" as const, label: "Light", icon: Sun },
@@ -62,11 +62,11 @@ export function Profile() {
     <div>
       <PageHeader title="Profile" />
 
-      <Card variant="outline" className="mb-6 flex items-center gap-4">
-        <Avatar name={user?.displayName ?? "?"} size={48} />
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-ink">{user?.displayName}</p>
-          <p className="text-sm text-muted">{user?.email}</p>
+      <Card variant="outline" className="mb-6 flex items-center gap-3.5 p-4">
+        <Avatar name={user?.displayName ?? "?"} size={56} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-lg font-semibold text-ink">{user?.displayName}</p>
+          <p className="truncate text-sm text-muted">{user?.email}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={signOut}>
           <SignOut size={16} />
@@ -74,7 +74,7 @@ export function Profile() {
         </Button>
       </Card>
 
-      <h2 className="mb-3 text-sm font-semibold text-ink">Body weight</h2>
+      <h2 className="section-title mb-2.5 px-1">Body weight</h2>
       <Card variant="outline" className="mb-6">
         <label className="flex flex-col gap-1.5">
           <span className="text-xs text-muted">Used to quick-fill bodyweight movements during a workout</span>
@@ -94,49 +94,39 @@ export function Profile() {
         </label>
       </Card>
 
-      <h2 className="mb-3 text-sm font-semibold text-ink">This week</h2>
+      <h2 className="section-title mb-2.5 px-1">This week</h2>
       <Card variant="outline" className="mb-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted">Time working out</p>
-            <p className="text-lg font-semibold text-ink">{formatDuration(stats.minutesThisWeek)}</p>
+            <p className="tabular text-xl font-semibold text-ink">{formatDuration(stats.minutesThisWeek)}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted">Volume</p>
-            <p className="text-lg font-semibold text-ink">{stats.volumeThisWeek.toLocaleString()} lb</p>
+            <p className="tabular text-xl font-semibold text-ink">{stats.volumeThisWeek.toLocaleString()} lb</p>
           </div>
         </div>
         <WeeklyActivityChart minutesByDay={stats.minutesByDay} />
       </Card>
 
-      <h2 className="mb-3 text-sm font-semibold text-ink">Lifetime</h2>
+      <h2 className="section-title mb-2.5 px-1">Lifetime</h2>
       <Card variant="outline" className="mb-6">
         <p className="text-xs text-muted">Total volume</p>
-        <p className="text-2xl font-semibold text-ink">{stats.volumeLifetime.toLocaleString()} lb</p>
+        <p className="tabular text-2xl font-semibold text-ink">{stats.volumeLifetime.toLocaleString()} lb</p>
       </Card>
 
-      <h2 className="mb-3 text-sm font-semibold text-ink">Appearance</h2>
-      <Card variant="outline" className="mb-6 flex items-center gap-1 p-1.5">
-        {themeOptions.map((option) => {
-          const Icon = option.icon;
-          const isActive = theme === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setTheme(option.value)}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-sm font-medium transition-colors",
-                isActive ? "bg-surface-card text-ink" : "text-muted hover:text-ink",
-              )}
-              aria-pressed={isActive}
-            >
-              <Icon size={16} />
-              {option.label}
-            </button>
-          );
-        })}
-      </Card>
+      <h2 className="section-title mb-2.5 px-1">Appearance</h2>
+      <SegmentedControl
+        ariaLabel="Appearance"
+        className="mb-6"
+        value={theme}
+        onChange={setTheme}
+        options={themeOptions.map(({ value, label, icon: Icon }) => ({
+          value,
+          label,
+          icon: <Icon size={16} />,
+        }))}
+      />
 
     </div>
   );

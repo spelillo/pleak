@@ -7,16 +7,14 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: Variant;
 }
 
+// "outline" is the grouped-list card: a raised surface on the page, no
+// border (the contrast with the page does the separating). "soft" is an
+// inset fill, for content nested inside a card.
 const variants: Record<Variant, string> = {
-  soft: "bg-surface-card",
-  outline: "bg-canvas border border-hairline shadow-[var(--shadow-sm)]",
+  soft: "bg-surface-soft",
+  outline: "bg-canvas shadow-[var(--shadow-sm)]",
 };
 
 export function Card({ variant = "soft", className, ...props }: CardProps) {
-  return (
-    <div
-      className={cn("rounded-lg p-6", variants[variant], className)}
-      {...props}
-    />
-  );
+  return <div className={cn("rounded-lg p-5", variants[variant], className)} {...props} />;
 }

@@ -31,10 +31,10 @@ function SelectChip({ label, active, onClick }: { label: string; active: boolean
       type="button"
       onClick={onClick}
       className={cn(
-        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors active:opacity-60",
         active
-          ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
-          : "border-hairline text-muted hover:text-ink",
+          ? "bg-brand-blue text-white"
+          : "bg-surface-card text-ink hover:bg-surface-strong",
       )}
     >
       {label}
@@ -70,7 +70,7 @@ export function CreateExerciseModal({ exercises, onCreate, onClose, isSaving, er
 
   return (
     <Modal onClose={onClose} ariaLabel="Add a custom exercise" className="max-w-lg">
-      <div className="border-b border-hairline p-4">
+      <div className="px-5 pb-3 pt-5">
         <p className="text-base font-semibold text-ink">Add exercise</p>
         <p className="text-xs text-muted">Only visible to you.</p>
       </div>

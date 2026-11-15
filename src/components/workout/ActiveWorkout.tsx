@@ -78,13 +78,13 @@ function Stepper({
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <motion.button
         type="button"
         onClick={() => onStep(-step)}
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
         transition={springDefault}
-        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-card text-ink transition-colors active:bg-surface-strong"
         aria-label="Decrease"
       >
         <Minus size={16} />
@@ -94,14 +94,14 @@ function Stepper({
         inputMode="numeric"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value ? Math.max(0, Number(e.target.value)) : undefined)}
-        className="h-11 min-w-0 flex-1 rounded-md border border-hairline bg-canvas text-center text-xl font-semibold text-ink outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+        className="h-11 min-w-0 flex-1 tabular rounded-md border border-transparent bg-surface-card text-center text-xl font-semibold text-ink outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/15"
       />
       <motion.button
         type="button"
         onClick={() => onStep(step)}
         whileTap={reduceMotion ? undefined : { scale: 0.97 }}
         transition={springDefault}
-        className="flex size-10 shrink-0 items-center justify-center rounded-full border border-hairline text-ink transition-colors"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-card text-ink transition-colors active:bg-surface-strong"
         aria-label="Increase"
       >
         <Plus size={16} />
@@ -435,7 +435,7 @@ export function ActiveWorkout({
     <div className="mb-8">
       <Card
         variant="outline"
-        className="relative mb-4 border-hairline/60 bg-canvas/70 text-center backdrop-blur-md"
+        className="relative mb-4 text-center"
       >
         <motion.button
           type="button"
@@ -457,8 +457,8 @@ export function ActiveWorkout({
         >
           <X size={18} weight="bold" />
         </motion.button>
-        <p className="font-display text-2xl font-semibold text-ink">{formatElapsed(elapsedSeconds)}</p>
-        <p className="text-sm text-muted">
+        <p className="tabular font-display text-[2.75rem] font-semibold leading-none tracking-[-0.03em] text-ink">{formatElapsed(elapsedSeconds)}</p>
+        <p className="mt-1.5 text-sm text-muted">
           {pausedAt
             ? "Paused"
             : exercises.length > 0
@@ -525,7 +525,7 @@ export function ActiveWorkout({
               aria-label="Add exercise"
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
               transition={springDefault}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-dashed border-hairline text-muted transition-colors hover:text-ink"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue transition-colors active:bg-brand-blue/15"
             >
               <Plus size={16} />
             </motion.button>
@@ -550,7 +550,7 @@ export function ActiveWorkout({
               <p className="mb-4 text-xs text-muted">{current.finished ? "Finished" : "Current exercise"}</p>
 
               {showEditor && currentSet && (
-                <div className="rounded-lg bg-surface-soft p-4">
+                <div className="rounded-md bg-surface-soft p-4">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-ink">Set {currentSetIndex + 1}</p>
                     {!isCardio && hasPR && (
@@ -626,7 +626,7 @@ export function ActiveWorkout({
               )}
 
               {current.sets.some((s) => s.completed) && (
-                <div className={cn("rounded-lg border border-hairline", showEditor && "mt-3")}>
+                <div className={cn("overflow-hidden rounded-md bg-surface-soft", showEditor && "mt-3")}>
                   {current.sets.map(
                     (set, i) =>
                       set.completed && <CompletedSetRow key={i} set={set} index={i} isCardio={isCardio} />,

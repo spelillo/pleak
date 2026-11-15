@@ -147,7 +147,7 @@ export function WeeklyPlanDayModal({
 
   return (
     <Modal onClose={onClose} ariaLabel={`Plan ${dayLabel}`} className="max-w-lg">
-      <div className="flex items-center justify-between border-b border-hairline p-4">
+      <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <div className="flex items-center gap-2">
           {step !== "type" && !existing && (
             <button
@@ -182,7 +182,7 @@ export function WeeklyPlanDayModal({
                 onClick={() => handleSelectType(type)}
                 whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                 transition={springDefault}
-                className="rounded-lg border border-hairline bg-surface-soft px-4 py-4 text-left transition-colors hover:bg-surface-card"
+                className="rounded-md bg-surface-soft px-4 py-3.5 text-left transition-[background-color,transform] duration-100 hover:bg-surface-card active:scale-[0.98] active:bg-surface-strong"
               >
                 <p className="text-base font-semibold text-ink">{type.label}</p>
                 <p className="text-sm text-muted">{type.description}</p>
@@ -200,7 +200,7 @@ export function WeeklyPlanDayModal({
               disabled={saveDay.isPending}
               whileTap={reduceMotion ? undefined : { scale: 0.98 }}
               transition={springDefault}
-              className="rounded-lg border border-hairline bg-surface-soft px-4 py-4 text-left transition-colors hover:bg-surface-card disabled:opacity-50"
+              className="rounded-md bg-surface-soft px-4 py-3.5 text-left transition-[background-color,transform] duration-100 hover:bg-surface-card active:scale-[0.98] active:bg-surface-strong disabled:opacity-50"
             >
               <p className="text-sm font-semibold text-ink">Just save the type</p>
               <p className="text-xs text-muted">Pick exercises later, right before you work out.</p>
@@ -210,7 +210,7 @@ export function WeeklyPlanDayModal({
               onClick={handleGenerateAndCurate}
               whileTap={reduceMotion ? undefined : { scale: 0.98 }}
               transition={springDefault}
-              className="rounded-lg border border-hairline bg-surface-soft px-4 py-4 text-left transition-colors hover:bg-surface-card"
+              className="rounded-md bg-surface-soft px-4 py-3.5 text-left transition-[background-color,transform] duration-100 hover:bg-surface-card active:scale-[0.98] active:bg-surface-strong"
             >
               <p className="text-sm font-semibold text-ink">Generate exercises now</p>
               <p className="text-xs text-muted">Curate a full exercise list you can edit later.</p>
@@ -268,7 +268,7 @@ export function WeeklyPlanDayModal({
             <button
               type="button"
               onClick={() => setShowPicker((v) => !v)}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-hairline px-4 py-3 text-sm font-medium text-muted transition-colors hover:border-brand-blue hover:text-ink"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-blue/10 px-4 py-3 text-sm font-semibold text-brand-blue transition-[background-color,transform] duration-100 active:scale-[0.98] active:bg-brand-blue/15"
             >
               <Plus size={16} weight="bold" />
               Add exercise

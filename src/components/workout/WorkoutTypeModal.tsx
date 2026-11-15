@@ -15,7 +15,7 @@ export function WorkoutTypeModal({
 
   return (
     <Modal onClose={onClose} ariaLabel="Select workout type" className="max-w-md">
-      <div className="flex items-center justify-between border-b border-hairline p-5">
+      <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <h2 className="text-lg font-semibold text-ink">Select Workout Type</h2>
         <button
           type="button"
@@ -35,7 +35,7 @@ export function WorkoutTypeModal({
             onClick={() => onSelect(type)}
             whileTap={reduceMotion ? undefined : { scale: 0.98 }}
             transition={springDefault}
-            className="rounded-lg border border-hairline bg-surface-soft px-4 py-4 text-left transition-colors hover:bg-surface-card"
+            className="rounded-md bg-surface-soft px-4 py-3.5 text-left transition-[background-color,transform] duration-100 hover:bg-surface-card active:scale-[0.98] active:bg-surface-strong"
           >
             <p className="text-base font-semibold text-ink">{type.label}</p>
             <p className="text-sm text-muted">{type.description}</p>

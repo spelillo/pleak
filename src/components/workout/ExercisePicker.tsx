@@ -47,7 +47,7 @@ export function ExercisePicker({
         (matches.length === 0 ? (
           <p className="mt-2 px-1 text-xs text-muted">No matching exercises.</p>
         ) : (
-          <ul className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-hairline">
+          <ul className="mt-2 max-h-56 overflow-y-auto rounded-md bg-surface-soft">
             {matches.map((ex, i) => (
               <li key={ex.id} className={i > 0 ? "border-t border-hairline" : ""}>
                 <button
@@ -56,7 +56,7 @@ export function ExercisePicker({
                     onSelect(ex);
                     setQuery("");
                   }}
-                  className="flex w-full flex-col items-start gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-surface-soft"
+                  className="flex w-full flex-col items-start gap-0.5 px-3.5 py-2.5 text-left transition-colors hover:bg-surface-card active:bg-surface-strong"
                 >
                   <span className="text-sm font-medium text-ink">{ex.name}</span>
                   {ex.muscleGroups.length > 0 && (

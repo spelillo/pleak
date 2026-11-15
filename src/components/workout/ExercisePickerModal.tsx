@@ -33,10 +33,10 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors active:opacity-60",
         active
-          ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
-          : "border-hairline text-muted hover:text-ink",
+          ? "bg-brand-blue text-white"
+          : "bg-surface-card text-ink hover:bg-surface-strong",
       )}
     >
       {label}
@@ -98,7 +98,7 @@ export function ExercisePickerModal({ exercises, onSelect, onClose, title }: Exe
 
   return (
     <Modal onClose={onClose} ariaLabel={title ?? "Choose an exercise"} className="max-w-lg">
-      <div className="border-b border-hairline p-4">
+      <div className="px-5 pb-3 pt-5">
         <p className="mb-3 text-base font-semibold text-ink">{title ?? "Choose an exercise"}</p>
 
         <div className="relative mb-3">
@@ -141,7 +141,7 @@ export function ExercisePickerModal({ exercises, onSelect, onClose, title }: Exe
                 <button
                   type="button"
                   onClick={() => onSelect(ex)}
-                  className="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-surface-soft"
+                  className="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-surface-card active:bg-surface-strong"
                 >
                   <span className="flex items-center gap-1.5">
                     <span className="text-sm font-medium text-ink">{ex.name}</span>
