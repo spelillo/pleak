@@ -14,8 +14,21 @@ import {
 import { apiPost } from "@/lib/api";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { User } from "@/lib/types";
+import type { WeightUnit } from "@/lib/units";
 
 const STORAGE_KEY = "pleak-user";
+// Device copy of the unit preference, used until the database has the
+// weight_unit column (supabase/migrations/20261115000100_users_weight_unit.sql).
+const UNIT_KEY = "pleak-weight-unit";
+
+function readStoredUnit(): WeightUnit | null {
+  try {
+    const saved = localStorage.getItem(UNIT_KEY);
+    return saved === "kg" || saved === "lb" ? saved : null;
+  } catch {
+    return null;
+  }
+}
 
 interface AuthContextType {
   user: User | null;
@@ -36,6 +49,9 @@ interface AuthContextType {
   completePasswordReset: (password: string) => Promise<void>;
   signOut: () => void;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
+  weightUnit: WeightUnit;
+  // Applies right away; saving to the account happens in the background.
+  setWeightUnit: (unit: WeightUnit) => Promise<void>;
 }
 
 // null clears a field (undefined would just be left out of the update).
@@ -51,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return saved ? (JSON.parse(saved) as User) : null;
   });
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+  const [deviceUnit, setDeviceUnit] = useState<WeightUnit | null>(readStoredUnit);
   // Bumped on every sign-out, so a profile refresh that was already in
   // flight can't land afterwards and put the person back in the app.
   const signOutCount = useRef(0);
@@ -142,6 +159,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await apiPost<User>("users", "update", { id: user.id, ...patch }));
   }
 
+  // The account's saved unit wins; the device copy covers a database that
+  // doesn't have the column yet, and a change that hasn't synced.
+  const weightUnit: WeightUnit = user?.weightUnit ?? deviceUnit ?? "lb";
+
+  async function setWeightUnit(unit: WeightUnit) {
+    setDeviceUnit(unit);
+    try {
+      localStorage.setItem(UNIT_KEY, unit);
+    } catch {
+      // Private mode: the preference just won't outlive this tab.
+    }
+    if (!user) return;
+    const previous = user;
+    setUser({ ...user, weightUnit: unit });
+    try {
+      setUser(await apiPost<User>("users", "update", { id: user.id, weightUnit: unit }));
+    } catch (err) {
+      // Keep the choice on this device, but don't leave a stale account value.
+      setUser({ ...previous, weightUnit: undefined });
+      throw err;
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -157,6 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         completePasswordReset,
         signOut,
         updateProfile,
+        weightUnit,
+        setWeightUnit,
       }}
     >
       {children}
@@ -170,4 +212,8 @@ export function useAuth() {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
+}
+
+export function useWeightUnit(): WeightUnit {
+  return useAuth().weightUnit;
 }
