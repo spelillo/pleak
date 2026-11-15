@@ -11,6 +11,22 @@ type Mode = "sign-in" | "sign-up" | "forgot";
 
 const MIN_PASSWORD_LENGTH = 8;
 
+// Supabase sends people back with #error=...&error_code=otp_expired when a
+// confirmation or reset link is stale or was already used. Read it once and
+// clear it from the address bar.
+function takeLinkError(): string | null {
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  if (!params.get("error")) return null;
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  if (params.get("error_code") === "otp_expired") {
+    return "That email link has expired or was already used. Request a new one below.";
+  }
+  return params.get("error_description") ?? "That email link didn't work. Try again.";
+}
+
+// Read at load, before anything else can rewrite the address.
+const initialLinkError = takeLinkError();
+
 const COPY: Record<Mode | "reset", { title: string; subtitle: string; submit: string; busy: string }> = {
   "sign-in": {
     title: "Sign in to Pleak",
@@ -46,7 +62,7 @@ export function SignInGate() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isBusy, setIsBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialLinkError);
   const [notice, setNotice] = useState<string | null>(null);
 
   const view = isRecoveringPassword ? "reset" : mode;
