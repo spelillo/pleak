@@ -19,20 +19,20 @@ export function Toast({ message, onClose }: { message: string | null; onClose: (
     <AnimatePresence>
       {message && (
         <motion.div
-          className="fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4"
+          className="fixed inset-x-0 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.75rem)] z-[70] flex justify-center px-4 md:bottom-6"
           initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
           animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
           transition={springDefault}
         >
-          <div className="flex max-w-sm items-start gap-2.5 rounded-lg border border-error/30 bg-canvas/95 p-3.5 shadow-[var(--shadow-lg)] backdrop-blur-xl">
+          <div className="flex max-w-sm items-start gap-2.5 material-bar rounded-lg py-3 pl-4 pr-3">
             <WarningCircle size={18} weight="fill" className="mt-0.5 shrink-0 text-error" />
-            <p className="text-sm text-ink">{message}</p>
+            <p className="text-sm font-medium text-ink">{message}</p>
             <button
               type="button"
               onClick={onClose}
               aria-label="Dismiss"
-              className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink"
+              className="ml-1 flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-card text-muted hover:text-ink"
             >
               <X size={14} />
             </button>

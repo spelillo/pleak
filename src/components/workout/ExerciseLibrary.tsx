@@ -40,7 +40,7 @@ export function ExerciseLibrary() {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink">Exercise library</h2>
+        <h2 className="section-title">Exercise library</h2>
         {!isLoading && !isError && exercises && exercises.length > 0 && (
           <span className="text-xs text-muted">{exercises.length} exercises</span>
         )}
@@ -97,7 +97,7 @@ export function ExerciseLibrary() {
               description="Try a different search term or category."
             />
           ) : (
-            <ul className="divide-y divide-hairline rounded-lg border border-hairline">
+            <ul className="divide-y divide-hairline overflow-hidden rounded-lg bg-canvas shadow-[var(--shadow-sm)]">
               {filtered.map((exercise) => (
                 <li key={exercise.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type HTMLMotionProps } from "motion/react";
 import { cn } from "@/lib/cn";
-import { springDefault } from "@/lib/motion";
+import { springSnappy } from "@/lib/motion";
 
 type Variant = "primary" | "secondary" | "text" | "icon";
 type Size = "md" | "sm";
@@ -12,21 +12,23 @@ interface ButtonProps extends HTMLMotionProps<"button"> {
   children: ReactNode;
 }
 
+// Feedback lands on pointer-down (whileTap + :active), not on release.
 const base =
-  "inline-flex items-center justify-center gap-2 font-semibold text-sm transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap";
+  "inline-flex select-none items-center justify-center gap-2 font-semibold text-sm transition-[background-color,opacity] duration-100 disabled:pointer-events-none disabled:opacity-40 whitespace-nowrap";
 
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-primary text-on-primary hover:bg-primary-active rounded-md px-5 h-10",
-  secondary:
-    "bg-canvas text-ink border border-hairline hover:bg-surface-soft rounded-md px-5 h-10",
-  text: "bg-transparent text-brand-blue hover:underline px-0 h-auto",
-  icon: "bg-canvas text-ink border border-hairline hover:bg-surface-soft rounded-full size-9 shrink-0",
+  // Filled, tinted: the one prominent action on a screen.
+  primary: "bg-primary text-on-primary active:bg-primary-active rounded-md px-5 h-11",
+  // Gray fill with tint text (Apple's bordered style).
+  secondary: "bg-surface-card text-brand-blue active:bg-surface-strong rounded-md px-5 h-11",
+  // Plain: tint text only, dims on press.
+  text: "bg-transparent text-brand-blue active:opacity-50 px-0 h-auto",
+  icon: "bg-surface-card text-ink active:bg-surface-strong rounded-full size-9 shrink-0",
 };
 
 const sizes: Record<Size, string> = {
   md: "",
-  sm: "text-xs h-8 px-3.5",
+  sm: "text-[0.8125rem] h-8 px-3.5 rounded-pill",
 };
 
 export function Button({
@@ -40,8 +42,8 @@ export function Button({
 
   return (
     <motion.button
-      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-      transition={springDefault}
+      whileTap={reduceMotion || variant === "text" ? undefined : { scale: 0.96 }}
+      transition={springSnappy}
       className={cn(base, variants[variant], variant !== "icon" && sizes[size], className)}
       {...props}
     >

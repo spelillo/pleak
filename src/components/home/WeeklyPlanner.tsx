@@ -70,7 +70,7 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
         <div>
           <div className="mb-1.5 flex items-center gap-2">
             <CalendarBlank size={18} className="text-brand-blue" />
-            <h2 className="text-lg font-semibold text-ink">Weekly Plan</h2>
+            <h2 className="section-title whitespace-nowrap">Weekly plan</h2>
           </div>
           <Badge tone="blue">{plannedCount}/7 days</Badge>
         </div>
@@ -79,16 +79,16 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
             type="button"
             onClick={() => setWeekStart((d) => addDays(d, -7))}
             aria-label="Previous week"
-            className="flex size-8 items-center justify-center rounded-full text-muted hover:text-ink"
+            className="flex size-8 items-center justify-center rounded-full text-brand-blue transition-colors hover:bg-surface-card active:bg-surface-strong"
           >
             <CaretLeft size={16} />
           </button>
-          <span className="min-w-[4.5rem] text-center text-sm text-muted">{formatWeekRange(weekStart)}</span>
+          <span className="tabular min-w-[4.5rem] text-center text-sm text-muted">{formatWeekRange(weekStart)}</span>
           <button
             type="button"
             onClick={() => setWeekStart((d) => addDays(d, 7))}
             aria-label="Next week"
-            className="flex size-8 items-center justify-center rounded-full text-muted hover:text-ink"
+            className="flex size-8 items-center justify-center rounded-full text-brand-blue transition-colors hover:bg-surface-card active:bg-surface-strong"
           >
             <CaretRight size={16} />
           </button>
@@ -110,8 +110,8 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
               whileTap={reduceMotion ? undefined : { scale: 0.96 }}
               transition={springDefault}
               className={cn(
-                "flex flex-col items-center gap-2 rounded-lg border px-1 py-3 transition-colors disabled:opacity-60",
-                isToday ? "border-brand-blue bg-brand-blue/5" : "border-hairline",
+                "flex flex-col items-center gap-1.5 rounded-md px-1 py-2.5 transition-colors disabled:opacity-60",
+                isToday ? "bg-brand-blue/12" : "bg-surface-soft",
               )}
             >
               <span className={cn("text-xs", isToday ? "font-medium text-brand-blue" : "text-muted")}>{label}</span>
@@ -131,7 +131,7 @@ export function WeeklyPlanner({ onError }: { onError: (message: string) => void 
       </div>
 
       {isCurrentWeek && (
-        <div className="mt-4 rounded-lg bg-surface-soft p-4">
+        <div className="mt-4 rounded-md bg-surface-soft px-4 py-3">
           <p className="text-sm font-semibold text-ink">Today: {FULL_DAY_LABELS[today.getDay()]}</p>
           <p className="text-sm text-muted">
             {isLoading ? "Loading…" : todayEntry ? todayEntry.title || "Workout planned" : "No workout planned"}

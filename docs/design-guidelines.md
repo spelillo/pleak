@@ -13,10 +13,10 @@ a compact daily-use app rather than a marketing site.
 - **Color Consistency Lock**: one accent pair only — UCLA Blue `#2774AE` and
   UCLA Gold `#FFD100` — defined once in `src/index.css` `@theme`. No other
   saturated accent gets introduced anywhere in the app.
-- **Shape Consistency Lock**: radius scale is `8px` (buttons/inputs),
-  `12px` (cards), pill (nav pills/badges), full circle (avatars/icon
-  buttons) — already encoded as `--radius-*` tokens. Never hand-pick a
-  one-off radius value in a component.
+- **Shape Consistency Lock**: radius scale is `12px` (buttons/inputs/
+  tiles), `20px` (cards), `28px` (sheets), pill (tab bar, chips, badges),
+  full circle (avatars/icon buttons) — encoded as `--radius-*` tokens.
+  Never hand-pick a one-off radius value in a component.
 - **Page Theme Lock**: light/dark is a whole-page toggle (`theme-context`),
   never a per-section flip. Both modes are designed and checked before a
   screen is considered done.
@@ -50,6 +50,38 @@ Every screen needs all four states before it's done, not just the happy path:
 - No filler verbs ("Elevate", "Unleash", "Seamless") in UI copy — plain,
   concrete labels only ("Log workout", not "Elevate your training").
 - No fake-precise placeholder numbers in seed/demo data.
+
+## Apple-style foundations (November 2026 redesign)
+
+The app follows Apple's Human Interface Guidelines, translated for the web:
+
+- **Type**: the system font first (SF Pro on Apple devices, Inter
+  elsewhere). Tracking is size-specific: large titles tighten
+  (`.display-sm`, `-0.022em`), small labels open up. Text sizes follow iOS
+  text styles (13 / 15 / 17 / 20 / 22 / 28) in `rem`, so the layout scales
+  with the reader's font size. Numbers that count use `.tabular`.
+- **Grouped layout**: cards (`bg-canvas`) sit on a slightly darker page
+  (`bg-page`); cards have no borders. Fills inside cards use the
+  translucent `surface-*` tokens. Dark mode is true black with `#1c1c1e`
+  cards.
+- **One tint**: UCLA Blue is the tint for everything interactive. The
+  primary button is filled with it; secondary buttons are a gray fill with
+  tint text; plain text buttons dim on press.
+- **Materials**: floating chrome (tab bar, header, sheets, toasts) uses the
+  `.material-bar` / `.material-header` / `.material-sheet` classes with
+  `backdrop-filter`. They go solid under `prefers-reduced-transparency`
+  and gain a defined edge under `prefers-contrast: more`.
+- **Sheets**: on phones `Modal` is a bottom sheet. It tracks the finger
+  1:1 from its top strip, rubber-bands when pulled up, and on release
+  projects the flick's momentum to choose between settling and dismissing,
+  handing the release velocity to the spring. It can be grabbed again
+  mid-animation. On wider screens it materializes in place (scale, blur
+  and opacity together).
+- **Selection**: segmented controls, the tab bar and the desktop nav use a
+  sliding thumb (`layoutId`) on a critically damped spring.
+- **Springs**: `src/lib/motion.ts` holds the house springs (`bounce: 0` by
+  default, a little bounce only after a gesture with momentum) plus the
+  `projectMomentum` and `rubberband` helpers.
 
 ## Motion (restrained, not landing-page choreography)
 

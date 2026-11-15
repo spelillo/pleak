@@ -44,7 +44,7 @@ function SessionCard({ session, isOpen, onToggle }: { session: WorkoutSession; i
       </button>
 
       {isOpen && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-hairline pt-4">
+        <div className="mt-4 flex flex-col gap-4 border-t border-hairline pt-4">
           {session.exercises.map((exercise) => (
             <div key={exercise.exerciseId}>
               <div className="mb-1.5 flex items-center justify-between">

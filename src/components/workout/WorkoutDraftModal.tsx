@@ -89,7 +89,7 @@ export function WorkoutDraftModal({
   return (
     <>
     <Modal onClose={onClose} ariaLabel={`${type.label} workout preview`} className="max-w-lg">
-      <div className="flex items-center justify-between border-b border-hairline p-4">
+      <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
@@ -168,7 +168,7 @@ export function WorkoutDraftModal({
         <button
           type="button"
           onClick={() => setShowPicker((v) => !v)}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-hairline px-4 py-4 text-sm font-medium text-muted transition-colors hover:border-brand-blue hover:text-ink"
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-blue/10 px-4 py-3.5 text-sm font-semibold text-brand-blue transition-[background-color,transform] duration-100 active:scale-[0.98] active:bg-brand-blue/15"
         >
           <Plus size={16} weight="bold" />
           Add exercise

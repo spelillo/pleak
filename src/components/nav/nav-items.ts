@@ -21,3 +21,8 @@ export const navItems: NavItem[] = [
   // { label: "Goals", path: "/goals", icon: Target },
   { label: "Profile", path: "/profile", icon: UserCircle },
 ];
+
+export function isItemActive(path: string, location: string) {
+  if (path === "/") return location === "/";
+  return location === path || location.startsWith(`${path}/`);
+}
