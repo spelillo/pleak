@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Barbell, CheckCircle, WarningCircle } from "@phosphor-icons/react";
+import { CheckCircle, WarningCircle } from "@phosphor-icons/react";
 import { useAuth } from "@/contexts/auth-context";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
@@ -93,26 +93,34 @@ export function SignInGate() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-canvas px-4">
-      <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-surface-card text-brand-blue">
-          <Barbell size={26} weight="bold" />
-        </div>
+    <div className="flex min-h-svh items-start justify-center bg-page px-4 pb-10 pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] sm:items-center sm:pt-10">
+      <div className="flex w-full max-w-sm animate-materialize flex-col items-center gap-7 text-center">
+        <img
+          src={`${import.meta.env.BASE_URL}icon-192.png`}
+          alt=""
+          className="size-20 rounded-[22.5%] shadow-[0_8px_24px_rgb(39_116_174/0.28),0_1px_3px_rgb(0_0_0/0.08)]"
+        />
         <div>
-          <h1 className="text-lg font-semibold text-ink">{copy.title}</h1>
-          <p className="mt-1 text-sm text-muted">{copy.subtitle}</p>
+          <h1 className="text-2xl font-bold text-ink">{copy.title}</h1>
+          <p className="mt-1.5 text-sm text-muted">{copy.subtitle}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3 text-left">
+        <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 text-left">
           {view === "sign-up" && (
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted">Name</span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
+              <span className="px-1 text-xs font-medium text-muted">Name</span>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                className="bg-canvas! shadow-[var(--shadow-sm)]"
+                required
+              />
             </label>
           )}
           {needsEmail && (
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted">Email</span>
+              <span className="px-1 text-xs font-medium text-muted">Email</span>
               <Input
                 type="email"
                 value={email}
@@ -120,19 +128,20 @@ export function SignInGate() {
                 autoComplete="email"
                 inputMode="email"
                 autoCapitalize="none"
+                className="bg-canvas! shadow-[var(--shadow-sm)]"
                 required
               />
             </label>
           )}
           {needsPassword && (
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs text-muted">
+              <div className="flex items-center justify-between px-1 text-xs font-medium text-muted">
                 <label htmlFor="pleak-password">{view === "reset" ? "New password" : "Password"}</label>
                 {view === "sign-in" && (
                   <button
                     type="button"
                     onClick={() => switchMode("forgot")}
-                    className="font-medium text-brand-blue hover:underline"
+                    className="font-medium text-brand-blue transition-opacity active:opacity-50"
                   >
                     Forgot password?
                   </button>
@@ -144,12 +153,13 @@ export function SignInGate() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={view === "sign-in" ? "current-password" : "new-password"}
+                className="bg-canvas! shadow-[var(--shadow-sm)]"
                 required
               />
             </div>
           )}
 
-          <Button type="submit" variant="primary" className="mt-1 w-full" disabled={isBusy || !!setupError}>
+          <Button type="submit" variant="primary" className="mt-2 h-12 w-full text-base" disabled={isBusy || !!setupError}>
             {isBusy ? copy.busy : copy.submit}
           </Button>
         </form>
@@ -159,14 +169,22 @@ export function SignInGate() {
             {mode === "sign-in" ? (
               <>
                 New here?{" "}
-                <button type="button" onClick={() => switchMode("sign-up")} className="font-medium text-brand-blue hover:underline">
+                <button
+                  type="button"
+                  onClick={() => switchMode("sign-up")}
+                  className="font-semibold text-brand-blue transition-opacity active:opacity-50"
+                >
                   Create an account
                 </button>
               </>
             ) : (
               <>
                 {mode === "sign-up" ? "Already have an account? " : "Remembered it? "}
-                <button type="button" onClick={() => switchMode("sign-in")} className="font-medium text-brand-blue hover:underline">
+                <button
+                  type="button"
+                  onClick={() => switchMode("sign-in")}
+                  className="font-semibold text-brand-blue transition-opacity active:opacity-50"
+                >
                   Sign in
                 </button>
               </>
@@ -176,15 +194,15 @@ export function SignInGate() {
 
         {notice && (
           <Card variant="outline" className="flex w-full items-start gap-3 text-left" role="status">
-            <CheckCircle size={20} className="mt-0.5 shrink-0 text-brand-blue" />
-            <p className="text-sm text-muted">{notice}</p>
+            <CheckCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-brand-blue" />
+            <p className="text-sm text-ink">{notice}</p>
           </Card>
         )}
 
         {(setupError || error) && (
-          <Card variant="outline" className="flex w-full items-start gap-3 border-error/30 text-left" role="alert">
-            <WarningCircle size={20} className="mt-0.5 shrink-0 text-error" />
-            <p className="text-sm text-muted">{setupError ?? error}</p>
+          <Card variant="outline" className="flex w-full items-start gap-3 text-left" role="alert">
+            <WarningCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-error" />
+            <p className="text-sm text-ink">{setupError ?? error}</p>
           </Card>
         )}
       </div>

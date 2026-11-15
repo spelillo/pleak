@@ -62,7 +62,7 @@ export function Profile() {
     <div>
       <PageHeader title="Profile" />
 
-      <Card variant="outline" className="mb-6 flex items-center gap-3.5 p-4">
+      <Card variant="outline" className="mb-6 flex items-center gap-3.5">
         <Avatar name={user?.displayName ?? "?"} size={56} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-semibold text-ink">{user?.displayName}</p>
