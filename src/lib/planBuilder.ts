@@ -2,15 +2,18 @@
 // picks exercises and writes copy; which days are training days and which
 // split day lands on each of them is decided here, so it's predictable,
 // testable, and can't drift week to week.
-import type { Exercise, WeeklyPlanDay, WorkoutExercise } from "@/lib/types";
+import type { Exercise, WeeklyPlanDay } from "@/lib/types";
 import {
-  generateDraftExercises,
+  balanceGroupsFor,
+  balanceQuotas,
+  exerciseCountFor,
+  pickBalancedExercises,
+  primaryMuscleGroup,
   matchesWorkoutType,
   PRIMARY_TARGETS,
   MOVEMENT_TYPES,
   toWorkoutExercise,
   WORKOUT_TYPES,
-  DEFAULT_EXERCISE_COUNT,
   type PrimaryTarget,
   type WorkoutTypeOption,
 } from "@/lib/workoutGeneration";
@@ -210,7 +213,8 @@ export interface BuildWeekRequestSlot {
   dayOfWeek: number;
   splitLabel: string;
   focus: string;
-  muscleRequirements?: Record<string, number>;
+  // Exercises per primary muscle group, e.g. { Chest: 2, Shoulders: 2, Triceps: 1 }.
+  balance: Record<string, number>;
   candidates: CandidateExercise[];
 }
 
@@ -227,18 +231,29 @@ export function candidatesFor(
   library: Exercise[],
   type: WorkoutTypeOption,
   avoidIds: Set<string>,
-  count: number = DEFAULT_EXERCISE_COUNT,
 ): Exercise[] {
   const matching = library.filter((ex) => matchesWorkoutType(ex, type));
-  const fresh = matching.filter((ex) => !avoidIds.has(ex.id));
-  return fresh.length >= count * 2 ? fresh : matching;
+  // Decided per muscle group, so a group with few exercises (calves) can
+  // still repeat one rather than come up empty.
+  const quotas = balanceQuotas(balanceGroupsFor(type), exerciseCountFor(type));
+  const byGroup = new Map<string, Exercise[]>();
+  for (const ex of matching) {
+    const g = primaryMuscleGroup(ex) ?? "";
+    byGroup.set(g, [...(byGroup.get(g) ?? []), ex]);
+  }
+  return [...byGroup.entries()].flatMap(([g, exercises]) => {
+    const fresh = exercises.filter((ex) => !avoidIds.has(ex.id));
+    return fresh.length >= Math.max(1, quotas[g] ?? 0) ? fresh : exercises;
+  });
 }
 
 /**
  * Turns the AI's picks (or nothing, if the AI was unavailable) into plan
- * days. Only ids from that slot's own candidate list are kept; anything
- * missing is topped up by the regular generator, so the result is always
- * a full workout of the right split even if the AI misbehaves.
+ * days. Only ids from that slot's own candidate list are considered, and
+ * they're run through the same muscle-group balancing as the built-in
+ * generator: a Push day always gets chest, shoulders and triceps in a
+ * 2/2/1 split, whatever the AI sent. Missing slots are filled at random
+ * from the short groups.
  */
 export function assembleWeek(
   slots: PlannedSlot[],
@@ -249,49 +264,15 @@ export function assembleWeek(
 ): Omit<WeeklyPlanDay, "id" | "createdAt">[] {
   const usedThisWeek = new Set<string>();
   return slots.map((slot) => {
-    const candidates = candidatesFor(library, slot.type, avoidIds);
+    const all = candidatesFor(library, slot.type, avoidIds);
+    // Avoid repeating an exercise within the week where the group allows it.
+    const unused = all.filter((ex) => !usedThisWeek.has(ex.id));
+    const candidates = unused.length >= exerciseCountFor(slot.type) ? unused : all;
     const byId = new Map(candidates.map((ex) => [ex.id, ex]));
     const aiDay = ai?.days.find((d) => d.dayOfWeek === slot.dayOfWeek);
-    const picked: WorkoutExercise[] = [];
-    for (const id of aiDay?.exerciseIds ?? []) {
-      const ex = byId.get(id);
-      if (!ex || usedThisWeek.has(id) || picked.length >= 7) continue;
-      picked.push(toWorkoutExercise(ex));
-      usedThisWeek.add(id);
-    }
-    // The split's minimums (e.g. Push needs a chest, a shoulder and a
-    // triceps movement) hold even when the AI's picks skip a group: an
-    // exercise from an over-covered group makes way for one that's missing.
-    const groupsOf = (w: WorkoutExercise) => byId.get(w.exerciseId)?.muscleGroups ?? [];
-    for (const [group, min] of Object.entries(slot.type.muscleRequirements ?? {})) {
-      const count = () => picked.filter((w) => groupsOf(w).includes(group)).length;
-      while (count() < min) {
-        const add = candidates.find((ex) => ex.muscleGroups.includes(group) && !usedThisWeek.has(ex.id));
-        if (!add) break;
-        if (picked.length >= DEFAULT_EXERCISE_COUNT) {
-          const requirements = slot.type.muscleRequirements ?? {};
-          const spare = [...picked].reverse().find((w) =>
-            groupsOf(w).every(
-              (g) => !(g in requirements) || picked.filter((p) => groupsOf(p).includes(g)).length > requirements[g],
-            ),
-          );
-          if (!spare) break;
-          picked.splice(picked.indexOf(spare), 1);
-          usedThisWeek.delete(spare.exerciseId);
-        }
-        picked.push(toWorkoutExercise(add));
-        usedThisWeek.add(add.id);
-      }
-    }
-    if (picked.length < DEFAULT_EXERCISE_COUNT) {
-      const pool = candidates.filter((ex) => !usedThisWeek.has(ex.id));
-      for (const ex of generateDraftExercises(pool, slot.type)) {
-        if (picked.length >= DEFAULT_EXERCISE_COUNT) break;
-        if (picked.some((p) => p.exerciseId === ex.exerciseId)) continue;
-        picked.push(ex);
-        usedThisWeek.add(ex.exerciseId);
-      }
-    }
+    const preferred = (aiDay?.exerciseIds ?? []).flatMap((id) => byId.get(id) ?? []);
+    const picked = pickBalancedExercises(candidates, slot.type, preferred);
+    for (const ex of picked) usedThisWeek.add(ex.id);
     const aiTitle = aiDay?.title?.trim().slice(0, 40);
     return {
       weeklyPlanId: base.weeklyPlanId,
@@ -299,7 +280,7 @@ export function assembleWeek(
       dayOfWeek: slot.dayOfWeek,
       title: aiTitle ? `${slot.type.label} Day: ${aiTitle}` : `${slot.type.label} Day`,
       isRestDay: false,
-      exercises: picked,
+      exercises: picked.map(toWorkoutExercise),
     };
   });
 }
@@ -315,7 +296,7 @@ export function toRequestSlots(
     focus: slot.type.movementType
       ? `${slot.type.movementType} movements (${slot.type.description})`
       : `Muscle groups: ${(slot.type.targets ?? []).join(", ")}`,
-    muscleRequirements: slot.type.muscleRequirements,
+    balance: balanceQuotas(balanceGroupsFor(slot.type), exerciseCountFor(slot.type)),
     candidates: candidatesFor(library, slot.type, avoidIds).map((ex) => ({
       id: ex.id,
       name: ex.name,
