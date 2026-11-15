@@ -40,19 +40,26 @@ delete from allowed_emails where email = 'friend@example.com';
 
 Emails must be lowercase.
 
-## 2. Set up email and password sign-in in Supabase
+## 2. Set up email and PIN sign-in in Supabase
 
-Pleak signs people in with an email and password through Supabase Auth.
+Pleak signs people in with an email and a 6-digit PIN through Supabase Auth
+(the PIN is the Supabase password). Confirming an email and resetting a PIN
+work with either the emailed link or the 6-digit code in the same email.
 
 1. Supabase → **Authentication** → **Sign In / Providers** → **Email**: make
-   sure it's enabled (it is by default). "Confirm email" on means new
-   accounts must click a link before their first sign-in.
-2. Supabase → **Authentication** → **URL Configuration**: set **Site URL** to
-   the live site (e.g. `https://pleak-synth10.vercel.app`) and add it, plus
-   `http://localhost:5173` for local dev, under **Redirect URLs**. The
-   confirmation and password-reset emails link back here.
-3. Optional: Supabase's built-in email sender is rate-limited to a few emails
-   an hour. For more, add your own SMTP under **Authentication → Emails**.
+   sure it's enabled, "Confirm email" is on, **Minimum password length** is 6,
+   and **Email OTP Length** is 6.
+2. Supabase → **Authentication** → **Emails** → **Templates**: in both
+   **Confirm signup** and **Reset password**, show the code with
+   `{{ .Token }}` (for example `<h2>{{ .Token }}</h2>`). Supabase only lets
+   you edit templates once custom SMTP is set up; until then the emails carry
+   just a link, which the app also handles.
+3. Supabase → **Authentication** → **URL Configuration**: set **Site URL** to
+   the live site (e.g. `https://pleak-synth10.vercel.app`) and add
+   `https://pleak-synth10.vercel.app/**` and `http://localhost:5173/**` under
+   **Redirect URLs**, so any link left in an email opens the app.
+4. Optional: Supabase's built-in email sender allows 2 emails an hour. For
+   more, add your own SMTP under **Authentication → Emails**.
 
 Only addresses in `allowed_emails` (step 1) can get into the app; anyone else
 can create a login but is stopped at "not allowed to sign in".

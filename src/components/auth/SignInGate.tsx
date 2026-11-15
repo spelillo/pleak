@@ -7,9 +7,15 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 
-type Mode = "sign-in" | "sign-up" | "forgot";
+// sign-in: email + PIN. sign-up: name, email, PIN, then confirm (emailed
+// code). forgot: email, then reset-code (emailed code + new PIN). "reset" is
+// the older link-based path, where opening the link already signed them in.
+type Mode = "sign-in" | "sign-up" | "confirm" | "forgot" | "reset-code";
+type View = Mode | "reset";
 
-const MIN_PASSWORD_LENGTH = 8;
+const PIN_LENGTH = 6;
+const CODE_LENGTH = 6;
+const digitsOnly = (value: string, max: number) => value.replace(/\D/g, "").slice(0, max);
 
 // Supabase sends people back with #error=...&error_code=otp_expired when a
 // confirmation or reset link is stale or was already used. Read it once and
@@ -27,7 +33,7 @@ function takeLinkError(): string | null {
 // Read at load, before anything else can rewrite the address.
 const initialLinkError = takeLinkError();
 
-const COPY: Record<Mode | "reset", { title: string; subtitle: string; submit: string; busy: string }> = {
+const COPY: Record<View, { title: string; subtitle: string; submit: string; busy: string }> = {
   "sign-in": {
     title: "Sign in to Pleak",
     subtitle: "Log and track your workouts.",
@@ -40,72 +46,126 @@ const COPY: Record<Mode | "reset", { title: string; subtitle: string; submit: st
     submit: "Create account",
     busy: "Creating account…",
   },
+  confirm: {
+    title: "Check your email",
+    subtitle: "Open the link in the email we sent, or type its 6-digit code here.",
+    submit: "Confirm",
+    busy: "Confirming…",
+  },
   forgot: {
-    title: "Reset your password",
-    subtitle: "We'll email you a link to choose a new one.",
-    submit: "Send reset link",
+    title: "Forgot your PIN?",
+    subtitle: "We'll email you a link (or code) to set a new one.",
+    submit: "Send code",
     busy: "Sending…",
   },
+  "reset-code": {
+    title: "Choose a new PIN",
+    subtitle: "Open the link in the email, or type its code and a new PIN here.",
+    submit: "Save PIN",
+    busy: "Saving…",
+  },
   reset: {
-    title: "Choose a new password",
+    title: "Choose a new PIN",
     subtitle: "You'll be signed in once it's saved.",
-    submit: "Save password",
+    submit: "Save PIN",
     busy: "Saving…",
   },
 };
 
+const fieldClass = "bg-canvas! shadow-[var(--shadow-sm)]";
+const digitFieldClass = `${fieldClass} text-center text-lg font-semibold tracking-[0.5em] tabular-nums`;
+
 export function SignInGate() {
-  const { setupError, isRecoveringPassword, signIn, signUp, requestPasswordReset, completePasswordReset } =
-    useAuth();
+  const auth = useAuth();
+  const { setupError, isRecoveringPassword } = auth;
   const [mode, setMode] = useState<Mode>("sign-in");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
+  const [code, setCode] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialLinkError);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const view = isRecoveringPassword ? "reset" : mode;
+  const view: View = isRecoveringPassword ? "reset" : mode;
   const copy = COPY[view];
-  const needsPassword = view !== "forgot";
-  const needsEmail = view !== "reset";
+  const needsEmail = view === "sign-in" || view === "sign-up" || view === "forgot";
+  const needsCode = view === "confirm" || view === "reset-code";
+  const needsPin = view !== "forgot" && view !== "confirm";
+  const isNewPin = view !== "sign-in";
 
-  function switchMode(next: Mode) {
+  function switchMode(next: Mode, keepMessages = false) {
     setMode(next);
-    setError(null);
-    setNotice(null);
-    setPassword("");
+    if (!keepMessages) {
+      setError(null);
+      setNotice(null);
+    }
+    setPin("");
+    setCode("");
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function run(action: () => Promise<void>) {
     setError(null);
     setNotice(null);
-    if (needsPassword && view !== "sign-in" && password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
-    }
     setIsBusy(true);
     try {
-      if (view === "sign-in") {
-        await signIn(email, password);
-      } else if (view === "sign-up") {
-        const result = await signUp(name, email, password);
-        if (result === "confirm-email") {
-          switchMode("sign-in");
-          setNotice(`Check ${email.trim()} for a confirmation link, then sign in.`);
-        }
-      } else if (view === "forgot") {
-        await requestPasswordReset(email);
-        setNotice(`If ${email.trim()} has an account, a reset link is on its way.`);
-      } else {
-        await completePasswordReset(password);
-      }
+      await action();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Check your connection and try again.");
     } finally {
       setIsBusy(false);
     }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (needsPin && pin.length !== PIN_LENGTH) {
+      setError(`Your PIN is ${PIN_LENGTH} digits.`);
+      return;
+    }
+    if (needsCode && code.length !== CODE_LENGTH) {
+      setError(`Enter the ${CODE_LENGTH}-digit code from the email.`);
+      return;
+    }
+    void run(async () => {
+      if (view === "sign-in") {
+        try {
+          await auth.signIn(email, pin);
+        } catch (err) {
+          // Never confirmed: take them to the code screen instead of a dead end.
+          if (err instanceof ApiError && /confirm your email/i.test(err.message)) {
+            switchMode("confirm", true);
+            setNotice(`Confirm ${email.trim()} first using the email we sent. No email? Send a new one.`);
+            return;
+          }
+          throw err;
+        }
+      } else if (view === "sign-up") {
+        const result = await auth.signUp(name, email, pin);
+        if (result === "confirm-email") {
+          switchMode("confirm", true);
+          setNotice(`We sent a confirmation email to ${email.trim()}.`);
+        }
+      } else if (view === "confirm") {
+        await auth.confirmEmail(email, code);
+      } else if (view === "forgot") {
+        await auth.requestPasswordReset(email);
+        switchMode("reset-code", true);
+        setNotice(`If ${email.trim()} has an account, a reset email is on its way.`);
+      } else if (view === "reset-code") {
+        await auth.resetPin(email, code, pin);
+      } else {
+        await auth.completePasswordReset(pin);
+      }
+    });
+  }
+
+  function resendCode() {
+    void run(async () => {
+      if (view === "confirm") await auth.resendConfirmation(email);
+      else await auth.requestPasswordReset(email);
+      setNotice(`Sent a new email to ${email.trim()}.`);
+    });
   }
 
   return (
@@ -121,17 +181,11 @@ export function SignInGate() {
           <p className="mt-1.5 text-sm text-muted">{copy.subtitle}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 text-left">
+        <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4 text-left" noValidate>
           {view === "sign-up" && (
             <label className="flex flex-col gap-1.5">
               <span className="px-1 text-xs font-medium text-muted">Name</span>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-                className="bg-canvas! shadow-[var(--shadow-sm)]"
-                required
-              />
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={fieldClass} required />
             </label>
           )}
           {needsEmail && (
@@ -144,32 +198,59 @@ export function SignInGate() {
                 autoComplete="email"
                 inputMode="email"
                 autoCapitalize="none"
-                className="bg-canvas! shadow-[var(--shadow-sm)]"
+                className={fieldClass}
                 required
               />
             </label>
           )}
-          {needsPassword && (
+          {needsCode && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between px-1 text-xs font-medium text-muted">
-                <label htmlFor="pleak-password">{view === "reset" ? "New password" : "Password"}</label>
+                <label htmlFor="pleak-code">Code from email</label>
+                <button
+                  type="button"
+                  onClick={resendCode}
+                  disabled={isBusy}
+                  className="font-medium text-brand-blue transition-opacity active:opacity-50 disabled:opacity-50"
+                >
+                  Resend email
+                </button>
+              </div>
+              <Input
+                id="pleak-code"
+                value={code}
+                onChange={(e) => setCode(digitsOnly(e.target.value, CODE_LENGTH))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={CODE_LENGTH}
+                className={digitFieldClass}
+                required
+              />
+            </div>
+          )}
+          {needsPin && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between px-1 text-xs font-medium text-muted">
+                <label htmlFor="pleak-pin">{isNewPin ? "New 6-digit PIN" : "PIN"}</label>
                 {view === "sign-in" && (
                   <button
                     type="button"
                     onClick={() => switchMode("forgot")}
                     className="font-medium text-brand-blue transition-opacity active:opacity-50"
                   >
-                    Forgot password?
+                    Forgot PIN?
                   </button>
                 )}
               </div>
               <Input
-                id="pleak-password"
+                id="pleak-pin"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={view === "sign-in" ? "current-password" : "new-password"}
-                className="bg-canvas! shadow-[var(--shadow-sm)]"
+                value={pin}
+                onChange={(e) => setPin(digitsOnly(e.target.value, PIN_LENGTH))}
+                inputMode="numeric"
+                autoComplete={isNewPin ? "new-password" : "current-password"}
+                maxLength={PIN_LENGTH}
+                className={digitFieldClass}
                 required
               />
             </div>
@@ -195,7 +276,7 @@ export function SignInGate() {
               </>
             ) : (
               <>
-                {mode === "sign-up" ? "Already have an account? " : "Remembered it? "}
+                {mode === "sign-up" || mode === "confirm" ? "Already have an account? " : "Remembered it? "}
                 <button
                   type="button"
                   onClick={() => switchMode("sign-in")}

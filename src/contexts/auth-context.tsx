@@ -1,7 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  confirmSignUp,
   fetchAppUser,
+  resendSignUpCode,
+  resetWithCode,
   sendPasswordReset,
   setNewPassword,
   signInWithPassword,
@@ -24,7 +27,12 @@ interface AuthContextType {
   // Resolves to "signed-in", or "confirm-email" when Supabase wants the
   // address confirmed before the first sign-in.
   signUp: (name: string, email: string, password: string) => Promise<"signed-in" | "confirm-email">;
+  confirmEmail: (email: string, code: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
+  // From the emailed reset code.
+  resetPin: (email: string, code: string, pin: string) => Promise<void>;
+  // From a reset link (isRecoveringPassword), where the session already exists.
   completePasswordReset: (password: string) => Promise<void>;
   signOut: () => void;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
@@ -108,6 +116,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return "signed-in" as const;
   }
 
+  async function confirmEmail(email: string, code: string) {
+    setUser(await confirmSignUp(email, code));
+  }
+
+  async function resetPin(email: string, code: string, pin: string) {
+    setUser(await resetWithCode(email, code, pin));
+    setIsRecoveringPassword(false);
+  }
+
   async function completePasswordReset(password: string) {
     setUser(await setNewPassword(password));
     setIsRecoveringPassword(false);
@@ -133,7 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isRecoveringPassword,
         signIn,
         signUp,
+        confirmEmail,
+        resendConfirmation: resendSignUpCode,
         requestPasswordReset: sendPasswordReset,
+        resetPin,
         completePasswordReset,
         signOut,
         updateProfile,
