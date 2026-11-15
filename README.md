@@ -7,7 +7,7 @@ A simple workout tracker for a small group of people, hosted on Vercel with Supa
 - React + TypeScript + Vite
 - Tailwind CSS v4 (brand tokens in [`src/index.css`](src/index.css))
 - Supabase Postgres with row-level security (data layer), schema in [`supabase/migrations`](supabase/migrations)
-- Google Sign-In, verified by Supabase Auth
+- Email and password sign-in via Supabase Auth
 - Vercel (hosting), config in [`vercel.json`](vercel.json)
 
 Setup and the move off Google Sheets / GitHub Pages: [docs/supabase-vercel-setup.md](docs/supabase-vercel-setup.md).
@@ -17,7 +17,7 @@ The old Apps Script backend (`apps-script/`, [docs/apps-script-setup.md](docs/ap
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in Supabase + Google values
+cp .env.example .env.local   # optional: point at another Supabase project
 npm run dev
 ```
 

@@ -1,47 +1,31 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { fetchAppUser, loginWithGoogle, signOutOfSupabase } from "@/lib/auth-api";
-import { apiPost, ApiError } from "@/lib/api";
+import {
+  fetchAppUser,
+  sendPasswordReset,
+  setNewPassword,
+  signInWithPassword,
+  signOutOfSupabase,
+  signUpWithPassword,
+} from "@/lib/auth-api";
+import { apiPost } from "@/lib/api";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import type { User } from "@/lib/types";
 
 const STORAGE_KEY = "pleak-user";
-const GIS_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
-
-// OAuth client IDs aren't secret (Google puts them in every sign-in page),
-// so the app's own ID is the fallback. Without it, a deploy missing the env
-// var rendered a sign-in screen with no button and no explanation.
-const DEFAULT_GOOGLE_CLIENT_ID = "899766933205-um8vmlar0c3jj443tqt9fhipt601gv1q.apps.googleusercontent.com";
-
-interface GoogleCredentialResponse {
-  credential: string;
-}
-
-interface GoogleIdConfig {
-  client_id: string;
-  callback: (response: GoogleCredentialResponse) => void;
-  nonce?: string;
-}
-
-interface GoogleIdApi {
-  initialize: (config: GoogleIdConfig) => void;
-  renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
-  disableAutoSelect: () => void;
-}
-
-declare global {
-  interface Window {
-    google?: { accounts: { id: GoogleIdApi } };
-  }
-}
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  error: string | null;
-  isGoogleReady: boolean;
   setupError: string | null;
-  renderSignInButton: (el: HTMLElement) => void;
+  // True after opening a password-reset link: the person has a session but
+  // must choose a new password before going into the app.
+  isRecoveringPassword: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  // Resolves to "signed-in", or "confirm-email" when Supabase wants the
+  // address confirmed before the first sign-in.
+  signUp: (name: string, email: string, password: string) => Promise<"signed-in" | "confirm-email">;
+  requestPasswordReset: (email: string) => Promise<void>;
+  completePasswordReset: (password: string) => Promise<void>;
   signOut: () => void;
   updateProfile: (patch: ProfilePatch) => Promise<void>;
 }
@@ -53,64 +37,58 @@ type ProfilePatch = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Supabase verifies Google ID tokens against a nonce: Google gets the
-// SHA-256 hash (it ends up in the token), Supabase gets the raw value.
-async function createNonce(): Promise<{ raw: string; hashed: string }> {
-  const raw = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-  const hashed = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-  return { raw, hashed };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
+  const [user, setUserState] = useState<User | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? (JSON.parse(saved) as User) : null;
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isGoogleReady, setIsGoogleReady] = useState(false);
-  const [googleLoadFailed, setGoogleLoadFailed] = useState(false);
-  const clientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || DEFAULT_GOOGLE_CLIENT_ID;
-  const setupError = !isSupabaseConfigured
-    ? "This deploy is missing its Supabase settings (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY), so sign-in can't work yet. Add them to the hosting project's environment variables and redeploy."
-    : googleLoadFailed
-      ? "Couldn't load Google sign-in. Check your connection or any content blocker, then reload."
-      : null;
-  const initialized = useRef(false);
-  const nonceRef = useRef<string>("");
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+  // Bumped on every sign-out, so a profile refresh that was already in
+  // flight can't land afterwards and put the person back in the app.
+  const signOutCount = useRef(0);
+  const setupError = isSupabaseConfigured
+    ? null
+    : "This deploy is missing its Supabase settings (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY), so sign-in can't work yet.";
+
+  function setUser(next: User | null) {
+    setUserState(next);
+    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    else localStorage.removeItem(STORAGE_KEY);
+  }
 
   // The cached user is only good while there's a live Supabase session
   // behind it (row-level security keys off that session). Drop it if the
-  // session is gone (e.g. the first load after moving off Google Sheets),
-  // otherwise refresh it from the database in the background.
+  // session is gone, otherwise refresh it from the database. This also
+  // picks up the session from an email-confirmation link.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
 
-    function clearUser() {
-      setUser(null);
-      localStorage.removeItem(STORAGE_KEY);
-    }
-
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (cancelled) return;
-      if (!data.session) {
-        clearUser();
-        return;
-      }
+    async function refresh() {
+      const startedAt = signOutCount.current;
       try {
         const fresh = await fetchAppUser();
-        if (cancelled) return;
-        setUser(fresh);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+        if (!cancelled && startedAt === signOutCount.current) setUser(fresh);
       } catch {
         // Offline or a transient error: keep the cached user.
       }
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session) void refresh();
+      else setUser(null);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") clearUser();
+      if (event === "SIGNED_OUT") {
+        signOutCount.current += 1;
+        setUser(null);
+      }
+      if (event === "PASSWORD_RECOVERY") setIsRecoveringPassword(true);
+      // Confirmation links sign the person in on load. Deferred so the
+      // database call doesn't run inside Supabase's auth callback.
+      if (event === "SIGNED_IN") setTimeout(() => void refresh(), 0);
     });
 
     return () => {
@@ -119,67 +97,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!clientId || initialized.current) return;
+  async function signIn(email: string, password: string) {
+    setUser(await signInWithPassword(email, password));
+  }
 
-    async function handleCredential(response: GoogleCredentialResponse) {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const loggedInUser = await loginWithGoogle(response.credential, nonceRef.current);
-        setUser(loggedInUser);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedInUser));
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Sign-in failed.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  async function signUp(name: string, email: string, password: string) {
+    const created = await signUpWithPassword(name, email, password);
+    if (!created) return "confirm-email" as const;
+    setUser(created);
+    return "signed-in" as const;
+  }
 
-    async function initGoogle() {
-      if (!window.google || initialized.current) return;
-      initialized.current = true;
-      const nonce = await createNonce();
-      nonceRef.current = nonce.raw;
-      window.google.accounts.id.initialize({ client_id: clientId!, callback: handleCredential, nonce: nonce.hashed });
-      setIsGoogleReady(true);
-    }
-
-    if (window.google) {
-      void initGoogle();
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = GIS_SCRIPT_SRC;
-    script.async = true;
-    script.onload = () => void initGoogle();
-    script.onerror = () => setGoogleLoadFailed(true);
-    document.head.appendChild(script);
-  }, [clientId]);
-
-  function renderSignInButton(el: HTMLElement) {
-    if (!window.google || !isGoogleReady) return;
-    window.google.accounts.id.renderButton(el, { theme: "outline", size: "large", width: 280 });
+  async function completePasswordReset(password: string) {
+    setUser(await setNewPassword(password));
+    setIsRecoveringPassword(false);
   }
 
   function signOut() {
+    signOutCount.current += 1;
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-    window.google?.accounts.id.disableAutoSelect();
+    setIsRecoveringPassword(false);
     void signOutOfSupabase();
   }
 
   async function updateProfile(patch: ProfilePatch) {
     if (!user) return;
-    const updated = await apiPost<User>("users", "update", { id: user.id, ...patch });
-    setUser(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setUser(await apiPost<User>("users", "update", { id: user.id, ...patch }));
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, error, isGoogleReady, setupError, renderSignInButton, signOut, updateProfile }}
+      value={{
+        user,
+        setupError,
+        isRecoveringPassword,
+        signIn,
+        signUp,
+        requestPasswordReset: sendPasswordReset,
+        completePasswordReset,
+        signOut,
+        updateProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

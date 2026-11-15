@@ -40,37 +40,33 @@ delete from allowed_emails where email = 'friend@example.com';
 
 Emails must be lowercase.
 
-## 2. Turn on Google sign-in in Supabase
+## 2. Set up email and password sign-in in Supabase
 
-The app keeps the same Google button; Supabase now verifies the Google token
-instead of Apps Script.
+Pleak signs people in with an email and password through Supabase Auth.
 
-1. Supabase → **Authentication** → **Sign In / Providers** → **Google** →
-   enable it.
-2. Under **Client IDs** (sometimes labelled "Authorized Client IDs"), add
-   your existing Google OAuth client ID (the one in `VITE_GOOGLE_CLIENT_ID`,
-   ending in `.apps.googleusercontent.com`). Client secret can be left as is;
-   the ID-token flow doesn't use it.
-3. Save.
+1. Supabase → **Authentication** → **Sign In / Providers** → **Email**: make
+   sure it's enabled (it is by default). "Confirm email" on means new
+   accounts must click a link before their first sign-in.
+2. Supabase → **Authentication** → **URL Configuration**: set **Site URL** to
+   the live site (e.g. `https://pleak-synth10.vercel.app`) and add it, plus
+   `http://localhost:5173` for local dev, under **Redirect URLs**. The
+   confirmation and password-reset emails link back here.
+3. Optional: Supabase's built-in email sender is rate-limited to a few emails
+   an hour. For more, add your own SMTP under **Authentication → Emails**.
 
-## 3. Allow the Vercel URL in Google Cloud
-
-[Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
-→ your OAuth client → **Authorized JavaScript origins**: add your Vercel
-URL(s), e.g. `https://pleak.vercel.app` and any custom domain. Keep
-`http://localhost:5173` for local dev. Redirect URIs stay empty.
+Only addresses in `allowed_emails` (step 1) can get into the app; anyone else
+can create a login but is stopped at "not allowed to sign in".
 
 ## 4. Vercel environment variables (optional)
 
-The app has Pleak's Supabase URL, publishable key and Google client ID built
-in (`src/lib/supabase.ts`, `src/contexts/auth-context.tsx`), so Vercel needs
+The app has Pleak's Supabase URL and publishable key built in
+(`src/lib/supabase.ts`), so Vercel needs
 no variables. Set these only to point a deploy at a different project:
 
 | Name | Value |
 | --- | --- |
 | `VITE_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon` `public` key |
-| `VITE_GOOGLE_CLIENT_ID` | same value as today |
 
 Never add the `service_role` key to Vercel. Vercel picks up `vercel.json`
 (Vite build, `dist` output, SPA rewrites) automatically. Redeploy after
@@ -95,10 +91,9 @@ node --env-file=.env.import scripts/import-from-sheets.mjs
 It prints a count per table. Skipped rows are ones with a missing id or
 pointing at a user or weekly plan that doesn't exist.
 
-Imported users aren't tied to a login yet. The first time each person signs
-in with Google on the new site, their account is matched to their imported
-row by email, so their history carries over. Everyone has to sign in once
-after the switch.
+Imported users aren't tied to a login yet. When each person creates an
+account on the new site with the same email, it's matched to their imported
+row, so their history carries over.
 
 ## 6. Cut over
 
@@ -106,7 +101,7 @@ after the switch.
    logged on the old site come across.
 2. Merge this branch. Vercel deploys `main`.
 3. Optional: add a custom domain in Vercel → **Settings** → **Domains** and
-   follow its DNS instructions, then add that origin in step 3.
+   follow its DNS instructions, then use it as the Site URL in step 2.
 4. Tell your group the new URL. Bookmarks and home-screen installs of the
    `github.io/pleak` address need replacing.
 

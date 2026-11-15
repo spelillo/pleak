@@ -33,8 +33,8 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  if (!user) return <SignInGate />;
+  const { user, isRecoveringPassword } = useAuth();
+  if (!user || isRecoveringPassword) return <SignInGate />;
   return <>{children}</>;
 }
 
