@@ -30,6 +30,7 @@ import { REPS_INCREMENT, toWorkoutExercise } from "@/lib/workoutGeneration";
 import { formatWeight, fromLb, otherUnit, toLb, weightIncrement } from "@/lib/units";
 import { getExercisePR } from "@/lib/personalRecords";
 import { cn } from "@/lib/cn";
+import { clearPauseState, loadPauseState, savePauseState } from "@/lib/workoutPause";
 import type { WorkoutSummary } from "@/components/workout/WorkoutSummaryModal";
 import type { Exercise, WorkoutExercise, WorkoutSession, WorkoutSet } from "@/lib/types";
 
@@ -198,9 +199,11 @@ export function ActiveWorkout({
   // Pause freezes the displayed/saved elapsed time without touching set
   // data. pausedAt is the timestamp pausing began (null while running);
   // totalPausedMs accumulates every past pause so resuming keeps counting
-  // from where it left off instead of losing the paused interval.
-  const [pausedAt, setPausedAt] = useState<number | null>(null);
-  const [totalPausedMs, setTotalPausedMs] = useState(0);
+  // from where it left off instead of losing the paused interval. Both are
+  // persisted per session so leaving the Workout tab or backgrounding the
+  // app doesn't silently un-pause the timer when this remounts.
+  const [pausedAt, setPausedAt] = useState<number | null>(() => loadPauseState(session.id).pausedAt);
+  const [totalPausedMs, setTotalPausedMs] = useState(() => loadPauseState(session.id).totalPausedMs);
   const isFirstRender = useRef(true);
   const prevLengthRef = useRef(exercises.length);
 
@@ -209,8 +212,9 @@ export function ActiveWorkout({
     setExercises(session.exercises);
     setCurrentIndex(initialIndex);
     setCurrentSetIndex(firstIncompleteSetIndex(session.exercises[initialIndex]?.sets ?? []));
-    setPausedAt(null);
-    setTotalPausedMs(0);
+    const pause = loadPauseState(session.id);
+    setPausedAt(pause.pausedAt);
+    setTotalPausedMs(pause.totalPausedMs);
   }, [session.id]);
 
   useEffect(() => {
@@ -253,12 +257,17 @@ export function ActiveWorkout({
   const isLastExercise = currentIndex === exercises.length - 1;
 
   function togglePause() {
+    const t = Date.now();
     if (pausedAt) {
-      setTotalPausedMs((ms) => ms + (Date.now() - pausedAt));
+      const nextTotal = totalPausedMs + (t - pausedAt);
+      setTotalPausedMs(nextTotal);
       setPausedAt(null);
+      setNow(t);
+      savePauseState(session.id, { pausedAt: null, totalPausedMs: nextTotal });
     } else {
-      setPausedAt(Date.now());
-      setNow(Date.now());
+      setPausedAt(t);
+      setNow(t);
+      savePauseState(session.id, { pausedAt: t, totalPausedMs });
     }
   }
 
@@ -383,10 +392,13 @@ export function ActiveWorkout({
   // user wait on the backend to see their own workout recap.
   function saveAndFinish(exercisesToSave: WorkoutExercise[]) {
     const endTime = new Date();
+    // Finishing while paused shouldn't count the current pause as workout time.
+    const pausedMs = totalPausedMs + (pausedAt ? endTime.getTime() - pausedAt : 0);
     const totalDurationSec = Math.max(
       0,
-      Math.round((endTime.getTime() - new Date(session.startTime).getTime() - totalPausedMs) / 1000),
+      Math.round((endTime.getTime() - new Date(session.startTime).getTime() - pausedMs) / 1000),
     );
+    clearPauseState(session.id);
     const durationMins = Math.max(1, Math.round(totalDurationSec / 60));
 
     onFinished({ name: session.name, durationMins, exercises: exercisesToSave });
@@ -417,6 +429,7 @@ export function ActiveWorkout({
   }
 
   function handleCancelWorkout() {
+    clearPauseState(session.id);
     deleteSession.mutate(session.id, {
       onError: () => onSaveError("Couldn't discard the workout — check your connection and try again."),
     });
