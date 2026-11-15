@@ -17,6 +17,10 @@ Either paste the migration into the Supabase SQL editor:
 2. Paste the whole of
    [`supabase/migrations/20261014000000_initial_schema.sql`](../supabase/migrations/20261014000000_initial_schema.sql)
    and click **Run**.
+3. Do the same with every later file in `supabase/migrations/`, oldest first
+   (for example
+   [`20261115000000_seed_exercise_library.sql`](../supabase/migrations/20261115000000_seed_exercise_library.sql),
+   which adds the 250+ exercise library).
 
 or, with the [Supabase CLI](https://supabase.com/docs/guides/cli):
 
