@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { CaretDown, Check } from "@phosphor-icons/react";
+import { CaretDown, CaretRight, Check } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
 import { EXERCISE_NAME_MAX_LENGTH, normalizeExerciseName, validateExerciseName } from "@/lib/exerciseName";
-import { findSimilarExercise } from "@/lib/exerciseMatch";
+import { findSimilarExercises } from "@/lib/exerciseMatch";
 import { inferMovementType, MUSCLE_GROUPS } from "@/lib/muscleGroups";
-import { useCreateExercise, useExercises } from "@/lib/queries/exercises";
+import { useCreateExercise, useExercises, useUpdateExercise } from "@/lib/queries/exercises";
 import { MOVEMENT_TYPES, type MovementType } from "@/lib/workoutGeneration";
 import type { Exercise } from "@/lib/types";
 
@@ -26,6 +26,8 @@ interface CreateExerciseModalProps {
   initialMuscleGroups?: string[];
   /** Prefills the movement type, e.g. Push when planning a push day. */
   initialMovementType?: MovementType;
+  /** Edit this custom exercise instead of creating a new one. */
+  exercise?: Exercise;
 }
 
 function FieldLabel({ children, htmlFor }: { children: string; htmlFor?: string }) {
@@ -70,27 +72,35 @@ export function CreateExerciseModal({
   initialName = "",
   initialMuscleGroups,
   initialMovementType,
+  exercise: editing,
 }: CreateExerciseModalProps) {
-  const { data: exercises } = useExercises();
+  const { data: allExercises } = useExercises();
+  // When editing, the exercise itself doesn't count as a duplicate.
+  const exercises = useMemo(
+    () => (allExercises ?? []).filter((ex) => ex.id !== editing?.id),
+    [allExercises, editing?.id],
+  );
   const createExercise = useCreateExercise();
-  const [name, setName] = useState(() => initialName.replace(/[^\p{L} ]/gu, ""));
+  const updateExercise = useUpdateExercise();
+  const saveMutation = editing ? updateExercise : createExercise;
+  const [name, setName] = useState(() => (editing?.name ?? initialName).replace(/[^\p{L} ]/gu, ""));
   const [nameTouched, setNameTouched] = useState(false);
-  const [muscleGroups, setMuscleGroups] = useState<string[]>(initialMuscleGroups ?? []);
+  const [muscleGroups, setMuscleGroups] = useState<string[]>(editing?.muscleGroups ?? initialMuscleGroups ?? []);
   // Fill in what we already know: the context's movement type, or else the
   // one the chosen muscles point to. Once the user picks one, it's theirs.
   const [movementType, setMovementType] = useState<MovementType | "">(
-    () => initialMovementType ?? inferMovementType(initialMuscleGroups ?? []) ?? "",
+    () => editing?.movementType ?? initialMovementType ?? inferMovementType(initialMuscleGroups ?? []) ?? "",
   );
-  const [movementPicked, setMovementPicked] = useState(!!initialMovementType);
+  const [movementPicked, setMovementPicked] = useState(!!(editing?.movementType ?? initialMovementType));
   const [isChecking, setIsChecking] = useState(false);
-  const [suggestion, setSuggestion] = useState<Exercise | null>(null);
+  const [suggestions, setSuggestions] = useState<Exercise[]>([]);
   // The name the user already said "create anyway" for, so we don't ask twice.
   const [confirmedName, setConfirmedName] = useState<string | null>(null);
 
   // The fixed list, plus anything else the library already uses.
   const muscleOptions = useMemo(() => {
     const extra = new Set<string>();
-    (exercises ?? []).forEach((ex) =>
+    exercises.forEach((ex) =>
       ex.muscleGroups.forEach((mg) => {
         if (!(MUSCLE_GROUPS as readonly string[]).includes(mg)) extra.add(mg);
       }),
@@ -100,7 +110,7 @@ export function CreateExerciseModal({
 
   const normalizedName = normalizeExerciseName(name);
   const nameError = validateExerciseName(name);
-  const isDuplicate = (exercises ?? []).some(
+  const isDuplicate = exercises.some(
     (ex) => ex.name.trim().toLowerCase() === normalizedName.toLowerCase(),
   );
   const shownNameError = nameTouched && normalizedName ? (nameError ?? (isDuplicate ? "That exercise is already in your library." : null)) : null;
@@ -113,7 +123,7 @@ export function CreateExerciseModal({
   }
 
   function handleClose() {
-    createExercise.reset();
+    saveMutation.reset();
     onClose();
   }
 
@@ -125,15 +135,17 @@ export function CreateExerciseModal({
   async function handleSave() {
     setNameTouched(true);
     if (!canSave || isChecking) return;
-    if (confirmedName !== normalizedName.toLowerCase()) {
+    // New exercises are checked against the library first. (Edits aren't:
+    // the exercise is already in use under its own id.)
+    if (!editing && confirmedName !== normalizedName.toLowerCase()) {
       setIsChecking(true);
-      const similar = await findSimilarExercise(
+      const similar = await findSimilarExercises(
         { name: normalizedName, muscleGroups: selectedMuscles(), movementType },
-        exercises ?? [],
+        exercises,
       );
       setIsChecking(false);
-      if (similar) {
-        setSuggestion(similar);
+      if (similar.length > 0) {
+        setSuggestions(similar);
         return;
       }
     }
@@ -143,16 +155,23 @@ export function CreateExerciseModal({
   async function save() {
     if (movementType === "") return;
     try {
-      const created = await createExercise.mutateAsync({
-        name: normalizedName,
-        category: "weightlifting",
-        exerciseType: "weights",
-        muscleGroups: selectedMuscles(),
-        movementType,
-      });
-      onCreated(created);
+      const saved = editing
+        ? await updateExercise.mutateAsync({
+            id: editing.id,
+            name: normalizedName,
+            muscleGroups: selectedMuscles(),
+            movementType,
+          })
+        : await createExercise.mutateAsync({
+            name: normalizedName,
+            category: "weightlifting",
+            exerciseType: "weights",
+            muscleGroups: selectedMuscles(),
+            movementType,
+          });
+      onCreated(saved);
     } catch {
-      // Shown below via createExercise.error.
+      // Shown below via saveMutation.error.
     }
   }
 
@@ -162,9 +181,9 @@ export function CreateExerciseModal({
 
   return createPortal(
     <div onPointerDown={stop} onPointerMove={stop} onPointerUp={stop} onPointerCancel={stop} onClick={stop}>
-    <Modal onClose={handleClose} ariaLabel="Create exercise" className="max-w-lg">
+    <Modal onClose={handleClose} ariaLabel={editing ? "Edit exercise" : "Create exercise"} className="max-w-lg">
       <div className="px-5 pb-3 pt-5">
-        <p className="text-base font-semibold text-ink">Create exercise</p>
+        <p className="text-base font-semibold text-ink">{editing ? "Edit exercise" : "Create exercise"}</p>
         <p className="text-xs text-muted">Only visible to you.</p>
       </div>
 
@@ -191,7 +210,7 @@ export function CreateExerciseModal({
               autoCapitalize="words"
               aria-invalid={shownNameError ? true : undefined}
               aria-describedby="create-exercise-name-hint"
-              autoFocus
+              autoFocus={!editing}
             />
             <p
               id="create-exercise-name-hint"
@@ -251,58 +270,72 @@ export function CreateExerciseModal({
         </div>
 
         <div className="border-t border-hairline p-4">
-          {createExercise.error && (
+          {saveMutation.error && (
             <p className="mb-2 text-xs text-error">Couldn't save the exercise. Check your connection and try again.</p>
           )}
           <Button
             type="submit"
             variant="primary"
             className="w-full"
-            disabled={!canSave || isChecking || createExercise.isPending}
+            disabled={!canSave || isChecking || saveMutation.isPending}
           >
-            {isChecking ? "Checking the library…" : createExercise.isPending ? "Saving…" : "Save exercise"}
+            {isChecking ? "Checking the library…" : saveMutation.isPending ? "Saving…" : editing ? "Save changes" : "Save exercise"}
           </Button>
         </div>
       </form>
     </Modal>
 
-    {suggestion && (
-      <Modal onClose={() => setSuggestion(null)} ariaLabel="Similar exercise found" className="max-w-sm">
-        <div className="px-5 pb-2 pt-6 text-center">
+    {suggestions.length > 0 && (
+      <Modal onClose={() => setSuggestions([])} ariaLabel="Similar exercises found" className="max-w-sm">
+        <div className="px-5 pb-3 pt-6 text-center">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Already in the library</p>
-          <p className="mt-1 text-lg font-semibold text-ink">Did you mean {suggestion.name}?</p>
-          <p className="mt-1 text-sm text-muted">
-            {[suggestion.muscleGroups.join(", "), suggestion.movementType].filter(Boolean).join(" · ")}
+          <p className="mt-1 text-lg font-semibold text-ink">
+            {suggestions.length === 1 ? `Did you mean ${suggestions[0].name}?` : "Did you mean one of these?"}
           </p>
-          <p className="mt-3 text-sm text-body">
-            It looks like the same movement as “{normalizedName}”. Use it to keep your history in one place.
+          <p className="mt-1 text-sm text-muted">
+            {suggestions.length === 1 ? "It" : "They"} look{suggestions.length === 1 ? "s" : ""} like “{normalizedName}”.
+            Using the library version keeps your history in one place.
           </p>
         </div>
+        <ul className="mx-4 divide-y divide-hairline overflow-hidden rounded-lg bg-surface-soft">
+          {suggestions.map((ex) => (
+            <li key={ex.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSuggestions([]);
+                  onCreated(ex);
+                }}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors active:bg-surface-strong"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-ink">{ex.name}</span>
+                  <span className="block truncate text-xs text-muted">
+                    {[ex.muscleGroups.join(", "), ex.movementType].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-0.5 text-sm font-semibold text-brand-blue">
+                  Use
+                  <CaretRight size={14} weight="bold" />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
         <div className="flex flex-col gap-2 p-4">
-          <Button
-            variant="primary"
-            className="w-full"
-            onClick={() => {
-              const existing = suggestion;
-              setSuggestion(null);
-              onCreated(existing);
-            }}
-          >
-            Use {suggestion.name}
-          </Button>
           <Button
             variant="secondary"
             className="w-full"
-            disabled={createExercise.isPending}
+            disabled={saveMutation.isPending}
             onClick={() => {
               setConfirmedName(normalizedName.toLowerCase());
-              setSuggestion(null);
+              setSuggestions([]);
               void save();
             }}
           >
             No, create “{normalizedName}”
           </Button>
-          <Button variant="text" className="mt-1 w-full justify-center" onClick={() => setSuggestion(null)}>
+          <Button variant="text" className="mt-1 w-full justify-center" onClick={() => setSuggestions([])}>
             Go back and edit
           </Button>
         </div>

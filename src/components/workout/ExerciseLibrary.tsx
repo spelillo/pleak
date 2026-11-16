@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { Barbell, MagnifyingGlass, Plus, WarningCircle } from "@phosphor-icons/react";
+import { Barbell, MagnifyingGlass, PencilSimple, Plus, Trash, WarningCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Modal } from "@/components/ui/Modal";
 import { PillTabs } from "@/components/ui/PillTabs";
 import { CreateExerciseModal } from "@/components/workout/CreateExerciseModal";
-import { useExercises } from "@/lib/queries/exercises";
+import { useDeleteExercise, useExercises } from "@/lib/queries/exercises";
 import { ApiError } from "@/lib/api";
 import { categoryLabel } from "@/lib/exerciseLabels";
 import type { Exercise } from "@/lib/types";
@@ -24,17 +25,29 @@ export function ExerciseLibrary() {
   const [category, setCategory] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [editing, setEditing] = useState<Exercise | null>(null);
+  const [deleting, setDeleting] = useState<Exercise | null>(null);
+  const deleteExercise = useDeleteExercise();
+  const hasCustom = (exercises ?? []).some((ex) => ex.userId);
 
   const categoryOptions = useMemo(() => {
     const set = new Set((exercises ?? []).map((ex) => ex.category));
-    return [{ value: "all", label: "All" }, ...Array.from(set).sort().map((c) => ({ value: c, label: categoryLabel(c) }))];
-  }, [exercises]);
+    return [
+      { value: "all", label: "All" },
+      ...(hasCustom ? [{ value: "custom", label: "My exercises" }] : []),
+      ...Array.from(set).sort().map((c) => ({ value: c, label: categoryLabel(c) })),
+    ];
+  }, [exercises, hasCustom]);
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return (exercises ?? []).filter(
-      (ex) => (category === "all" || ex.category === category) && matchesQuery(ex, normalizedQuery),
+    const matching = (exercises ?? []).filter(
+      (ex) =>
+        (category === "all" || (category === "custom" ? !!ex.userId : ex.category === category)) &&
+        matchesQuery(ex, normalizedQuery),
     );
+    // The user's own exercises first, so they're easy to find and manage.
+    return [...matching.filter((ex) => ex.userId), ...matching.filter((ex) => !ex.userId)];
   }, [exercises, query, category]);
 
   // Choice overload: a short list until the user searches or asks for more.
@@ -110,11 +123,32 @@ export function ExerciseLibrary() {
                       <p className="truncate text-xs text-muted">{exercise.muscleGroups.join(", ")}</p>
                     )}
                   </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    {exercise.userId && <Badge tone="purple">Custom</Badge>}
-                    {exercise.movementType && <Badge tone="gold">{exercise.movementType}</Badge>}
-                    <Badge tone="blue">{categoryLabel(exercise.category)}</Badge>
-                  </div>
+                  {exercise.userId ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Badge tone="purple">Custom</Badge>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(exercise)}
+                        aria-label={`Edit ${exercise.name}`}
+                        className="flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:text-ink active:bg-surface-strong"
+                      >
+                        <PencilSimple size={17} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleting(exercise)}
+                        aria-label={`Delete ${exercise.name}`}
+                        className="-mr-2 flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:text-error active:bg-surface-strong"
+                      >
+                        <Trash size={17} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex shrink-0 gap-1.5">
+                      {exercise.movementType && <Badge tone="gold">{exercise.movementType}</Badge>}
+                      <Badge tone="blue">{categoryLabel(exercise.category)}</Badge>
+                    </div>
+                  )}
                 </li>
               ))}
               {visible.length < filtered.length && (
@@ -135,6 +169,52 @@ export function ExerciseLibrary() {
 
       {showCreate && (
         <CreateExerciseModal onCreated={() => setShowCreate(false)} onClose={() => setShowCreate(false)} />
+      )}
+
+      {editing && (
+        <CreateExerciseModal exercise={editing} onCreated={() => setEditing(null)} onClose={() => setEditing(null)} />
+      )}
+
+      {deleting && (
+        <Modal
+          onClose={() => {
+            deleteExercise.reset();
+            setDeleting(null);
+          }}
+          ariaLabel={`Delete ${deleting.name}`}
+          className="max-w-sm p-6"
+        >
+          <h3 className="mb-2 text-lg font-semibold text-ink">Delete {deleting.name}?</h3>
+          <p className="mb-5 text-sm text-muted">
+            It's removed from your library. Workouts and plans you've already logged keep it.
+          </p>
+          {deleteExercise.error && (
+            <p className="mb-3 text-xs text-error">Couldn't delete it. Check your connection and try again.</p>
+          )}
+          <div className="flex flex-col gap-2">
+            <Button
+              className="w-full bg-error! active:opacity-80"
+              disabled={deleteExercise.isPending}
+              onClick={() =>
+                deleteExercise.mutate(deleting.id, {
+                  onSuccess: () => setDeleting(null),
+                })
+              }
+            >
+              {deleteExercise.isPending ? "Deleting…" : "Delete exercise"}
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => {
+                deleteExercise.reset();
+                setDeleting(null);
+              }}
+            >
+              Keep it
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
