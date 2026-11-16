@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
 import { EXERCISE_NAME_MAX_LENGTH, normalizeExerciseName, validateExerciseName } from "@/lib/exerciseName";
 import { findSimilarExercise } from "@/lib/exerciseMatch";
-import { MUSCLE_GROUPS } from "@/lib/muscleGroups";
+import { inferMovementType, MUSCLE_GROUPS } from "@/lib/muscleGroups";
 import { useCreateExercise, useExercises } from "@/lib/queries/exercises";
 import { MOVEMENT_TYPES, type MovementType } from "@/lib/workoutGeneration";
 import type { Exercise } from "@/lib/types";
@@ -22,6 +22,10 @@ interface CreateExerciseModalProps {
   onClose: () => void;
   /** Prefills the name, e.g. with what the user was searching for. */
   initialName?: string;
+  /** Prefills the muscles, e.g. the muscle the picker was filtered to. */
+  initialMuscleGroups?: string[];
+  /** Prefills the movement type, e.g. Push when planning a push day. */
+  initialMovementType?: MovementType;
 }
 
 function FieldLabel({ children, htmlFor }: { children: string; htmlFor?: string }) {
@@ -60,13 +64,24 @@ function MuscleCheckbox({ label, checked, onToggle }: { label: string; checked: 
  * more muscle groups, and a Push / Pull / Legs movement type. Rendered in a
  * portal so it can open from inside another sheet.
  */
-export function CreateExerciseModal({ onCreated, onClose, initialName = "" }: CreateExerciseModalProps) {
+export function CreateExerciseModal({
+  onCreated,
+  onClose,
+  initialName = "",
+  initialMuscleGroups,
+  initialMovementType,
+}: CreateExerciseModalProps) {
   const { data: exercises } = useExercises();
   const createExercise = useCreateExercise();
   const [name, setName] = useState(() => initialName.replace(/[^\p{L} ]/gu, ""));
   const [nameTouched, setNameTouched] = useState(false);
-  const [muscleGroups, setMuscleGroups] = useState<string[]>([]);
-  const [movementType, setMovementType] = useState<MovementType | "">("");
+  const [muscleGroups, setMuscleGroups] = useState<string[]>(initialMuscleGroups ?? []);
+  // Fill in what we already know: the context's movement type, or else the
+  // one the chosen muscles point to. Once the user picks one, it's theirs.
+  const [movementType, setMovementType] = useState<MovementType | "">(
+    () => initialMovementType ?? inferMovementType(initialMuscleGroups ?? []) ?? "",
+  );
+  const [movementPicked, setMovementPicked] = useState(!!initialMovementType);
   const [isChecking, setIsChecking] = useState(false);
   const [suggestion, setSuggestion] = useState<Exercise | null>(null);
   // The name the user already said "create anyway" for, so we don't ask twice.
@@ -92,7 +107,9 @@ export function CreateExerciseModal({ onCreated, onClose, initialName = "" }: Cr
   const canSave = !nameError && !isDuplicate && muscleGroups.length > 0 && movementType !== "";
 
   function toggleMuscle(mg: string) {
-    setMuscleGroups((prev) => (prev.includes(mg) ? prev.filter((m) => m !== mg) : [...prev, mg]));
+    const next = muscleGroups.includes(mg) ? muscleGroups.filter((m) => m !== mg) : [...muscleGroups, mg];
+    setMuscleGroups(next);
+    if (!movementPicked) setMovementType(inferMovementType(next) ?? "");
   }
 
   function handleClose() {
@@ -206,7 +223,10 @@ export function CreateExerciseModal({ onCreated, onClose, initialName = "" }: Cr
               <select
                 id="create-exercise-movement"
                 value={movementType}
-                onChange={(e) => setMovementType(e.target.value as MovementType | "")}
+                onChange={(e) => {
+                  setMovementType(e.target.value as MovementType | "");
+                  setMovementPicked(true);
+                }}
                 className={cn(
                   "h-11 w-full appearance-none rounded-md border border-transparent bg-surface-card pl-3.5 pr-10 text-base",
                   "outline-none transition-[border-color,box-shadow] duration-150 focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/15",

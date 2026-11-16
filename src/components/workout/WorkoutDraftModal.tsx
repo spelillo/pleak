@@ -191,6 +191,7 @@ export function WorkoutDraftModal({
         exercises={availableToAdd}
         title="Add exercise"
         allowCreate
+        createDefaults={{ movementType: type.movementType }}
         onSelect={(ex) => {
           onAddExercise(ex);
           setShowPicker(false);

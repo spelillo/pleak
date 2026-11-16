@@ -4,7 +4,6 @@ import { CheckCircle, WarningCircle } from "@phosphor-icons/react";
 import { useAuth } from "@/contexts/auth-context";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { PinPad } from "./PinPad";
 
@@ -364,6 +363,20 @@ export function SignInGate() {
               />
             </div>
           )}
+          {/* Messages sit in the form, right above the button they're about,
+              where the eye already is, rather than at the bottom of the page. */}
+          {notice && (
+            <p className="flex items-start gap-2.5 rounded-md bg-surface-soft px-3.5 py-3 text-left text-sm text-ink" role="status">
+              <CheckCircle size={18} weight="fill" className="mt-px shrink-0 text-brand-blue" />
+              {notice}
+            </p>
+          )}
+          {(setupError || error) && (
+            <p className="flex items-start gap-2.5 rounded-md bg-surface-soft px-3.5 py-3 text-left text-sm text-ink" role="alert">
+              <WarningCircle size={18} weight="fill" className="mt-px shrink-0 text-error" />
+              {setupError ?? error}
+            </p>
+          )}
           <Button type="submit" variant="primary" className="mt-2 h-12 w-full text-base" disabled={isBusy || !!setupError}>
             {isBusy ? copy.busy : copy.submit}
           </Button>
@@ -397,19 +410,6 @@ export function SignInGate() {
           </p>
         )}
 
-        {notice && (
-          <Card variant="outline" className="flex w-full items-start gap-3 text-left" role="status">
-            <CheckCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-brand-blue" />
-            <p className="text-sm text-ink">{notice}</p>
-          </Card>
-        )}
-
-        {(setupError || error) && (
-          <Card variant="outline" className="flex w-full items-start gap-3 text-left" role="alert">
-            <WarningCircle size={20} weight="fill" className="mt-0.5 shrink-0 text-error" />
-            <p className="text-sm text-ink">{setupError ?? error}</p>
-          </Card>
-        )}
       </div>
     </div>
   );

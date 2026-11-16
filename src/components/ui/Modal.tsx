@@ -200,9 +200,12 @@ export function Modal({ onClose, children, className, ariaLabel }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center md:p-6">
+      {/* Figure and ground: the scrim takes the page behind from ~17:1
+          text contrast down to ~2.5:1 (in both themes), so the sheet is the
+          only thing competing for attention. Stacked sheets dim again. */}
       <motion.div
         aria-hidden
-        className="absolute inset-0 bg-black/35"
+        className="absolute inset-0 bg-black/68"
         style={{ opacity: scrim }}
         onClick={() => dismiss()}
       />

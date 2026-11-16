@@ -347,3 +347,12 @@ a,
     opacity: 0;
   }
 }
+
+/* Horizontal rails that scroll edge to edge: the cut-off item at the edge
+   is the scroll cue, so the bar itself is hidden. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

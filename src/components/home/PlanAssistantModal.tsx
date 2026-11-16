@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, ArrowsClockwise, Check, CircleNotch, Sparkle, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowsClockwise, Check, CircleNotch, Info, Sparkle, X } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { StepTrack } from "@/components/ui/StepTrack";
 import { cn } from "@/lib/cn";
 import { springDefault } from "@/lib/motion";
 import { apiGet } from "@/lib/api";
 import { useExercises } from "@/lib/queries/exercises";
+import { useWorkoutSessions } from "@/lib/queries/workoutSessions";
 import {
   generateWeek,
   interpretSplit,
@@ -40,6 +42,22 @@ import type { WorkoutTypeOption } from "@/lib/workoutGeneration";
 type Step = "split" | "describe" | "daysOff" | "frequency" | "building" | "preview";
 type StartWeek = "this" | "next";
 
+const STEP_LABELS = ["Split", "Days off", "Workouts", "Review"];
+
+// How often the user has actually been training: completed workouts over
+// the last four weeks, mapped onto the frequency buckets. Null when there's
+// no recent history to go on.
+function frequencyFromHistory(startTimes: string[], now: Date): Frequency | null {
+  const since = now.getTime() - 28 * 24 * 60 * 60 * 1000;
+  const recent = startTimes.filter((t) => new Date(t).getTime() >= since).length;
+  if (recent === 0) return null;
+  const perWeek = recent / 4;
+  if (perWeek <= 2) return "1-2";
+  if (perWeek <= 3) return "2-3";
+  if (perWeek <= 5) return "4-5";
+  return "6+";
+}
+
 function listDays(days: number[]): string {
   const names = days.map((d) => FULL_DAY_LABELS[d]);
   if (names.length <= 1) return names.join("");
@@ -62,6 +80,7 @@ export function PlanAssistantModal({
   const queryClient = useQueryClient();
   const reduceMotion = useReducedMotion();
   const { data: library } = useExercises();
+  const { data: sessions } = useWorkoutSessions(userId);
 
   const today = new Date();
   const thisWeekStart = startOfWeek(today);
@@ -77,6 +96,8 @@ export function PlanAssistantModal({
   const [interpreting, setInterpreting] = useState(false);
   const [daysOff, setDaysOff] = useState<number[]>(previous?.daysOff ?? []);
   const [frequency, setFrequency] = useState<Frequency | null>(previous?.frequency ?? null);
+  // Set when the frequency was filled in from the user's recent workouts.
+  const [frequencyFromLog, setFrequencyFromLog] = useState(false);
   const [startWeek, setStartWeek] = useState<StartWeek>("this");
   const [result, setResult] = useState<{ config: AiPlanConfig; week: GeneratedWeek; fromDay: number } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -188,6 +209,22 @@ export function PlanAssistantModal({
     }
   }
 
+  // Fill in what we already know: a first-time plan starts from how often
+  // the user has actually been working out.
+  function goToFrequency() {
+    if (!frequency && sessions) {
+      const fromLog = frequencyFromHistory(
+        sessions.filter((s) => !s.isActive).map((s) => s.startTime),
+        today,
+      );
+      if (fromLog) {
+        setFrequency(fromLog);
+        setFrequencyFromLog(true);
+      }
+    }
+    setStep("frequency");
+  }
+
   function goBack() {
     const order: Step[] = ["split", ...(split === "custom" ? (["describe"] as Step[]) : []), "daysOff", "frequency", "preview"];
     const i = order.indexOf(step);
@@ -200,7 +237,7 @@ export function PlanAssistantModal({
       selected ? "bg-brand-blue/12 ring-2 ring-brand-blue" : "bg-surface-soft hover:bg-surface-card active:bg-surface-strong",
     );
 
-  const stepNumber = { split: 1, describe: 1, daysOff: 2, frequency: 3, building: 3, preview: 3 }[step];
+  const stepIndex = { split: 0, describe: 0, daysOff: 1, frequency: 2, building: 3, preview: 3 }[step];
 
   return (
     <Modal onClose={onClose} ariaLabel="Help build my plan" className="md:max-w-lg">
@@ -230,9 +267,7 @@ export function PlanAssistantModal({
       </div>
 
       <div className="overflow-y-auto px-5 pb-5">
-        {step !== "preview" && step !== "building" && (
-          <p className="label-tracked mb-3 text-xs font-semibold text-muted">Step {stepNumber} of 3</p>
-        )}
+        <StepTrack steps={STEP_LABELS} current={stepIndex} className="mb-5" />
 
         {step === "split" && (
           <div className="flex flex-col gap-3">
@@ -332,7 +367,7 @@ export function PlanAssistantModal({
                   ? "Leave at least one day open to train."
                   : `Off: ${listDays(daysOff)}.`}
             </p>
-            <Button className="mt-1" disabled={daysOff.length === 7} onClick={() => setStep("frequency")}>
+            <Button className="mt-1" disabled={daysOff.length === 7} onClick={goToFrequency}>
               Continue
             </Button>
           </div>
@@ -340,7 +375,10 @@ export function PlanAssistantModal({
 
         {step === "frequency" && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted">How many workouts a week?</p>
+            <p className="text-sm text-muted">
+              How many workouts a week?
+              {frequencyFromLog && " We picked what you've averaged over the last 4 weeks."}
+            </p>
             <div role="radiogroup" aria-label="Workouts per week" className="grid grid-cols-2 gap-2">
               {FREQUENCY_OPTIONS.map((option) => (
                 <motion.button
@@ -348,7 +386,10 @@ export function PlanAssistantModal({
                   type="button"
                   role="radio"
                   aria-checked={frequency === option.value}
-                  onClick={() => setFrequency(option.value)}
+                  onClick={() => {
+                    setFrequency(option.value);
+                    setFrequencyFromLog(false);
+                  }}
                   whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                   transition={springDefault}
                   className={optionClass(frequency === option.value)}
@@ -399,6 +440,13 @@ export function PlanAssistantModal({
               value={startWeek}
               onChange={(value) => value !== startWeek && build(value)}
             />
+            {!result.week.usedAi && (
+              <p className="flex items-start gap-2.5 rounded-md bg-surface-soft px-4 py-3 text-sm text-ink">
+                <Info size={18} className="mt-px shrink-0 text-muted" />
+                The AI coach couldn't be reached, so these exercises came from the built-in picker. Tap New exercises to
+                try the AI again.
+              </p>
+            )}
             <p className="text-sm text-muted">
               {splitDisplayName(result.config)} · Week of{" "}
               {formatWeekRange(startWeek === "this" ? thisWeekStart : addDays(thisWeekStart, 7))}
@@ -428,13 +476,10 @@ export function PlanAssistantModal({
               })}
             </ul>
 
-            <p className="rounded-md bg-brand-blue/12 px-4 py-3 text-sm text-ink">
-              You can change any day by tapping it in your weekly plan. Every new week gets fresh exercises, and the split
-              keeps rotating so the same muscle group never lands on back-to-back days.
+            <p className="px-1 text-sm text-muted">
+              Tap any day in your weekly plan to change it. Each new week gets fresh exercises, and the split keeps
+              rotating so the same muscle group never lands on back-to-back days.
             </p>
-            {!result.week.usedAi && (
-              <p className="text-sm text-muted">The AI coach couldn't be reached, so these exercises came from the built-in picker.</p>
-            )}
 
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1" disabled={saving} onClick={() => build(startWeek)}>
