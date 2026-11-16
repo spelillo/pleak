@@ -7,6 +7,7 @@ import {
   CaretLeft,
   CaretRight,
   CaretUp,
+  Check,
   CheckCircle,
   Minus,
   Pause,
@@ -28,7 +29,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { WeightValue } from "@/components/ui/WeightValue";
 import { REPS_INCREMENT, toWorkoutExercise } from "@/lib/workoutGeneration";
 import { formatWeight, fromLb, otherUnit, toLb, weightIncrement } from "@/lib/units";
-import { getExercisePR } from "@/lib/personalRecords";
+import { getExercisePR, getLastCompletedSet } from "@/lib/personalRecords";
 import { cn } from "@/lib/cn";
 import { clearPauseState, loadPauseState, savePauseState } from "@/lib/workoutPause";
 import type { WorkoutSummary } from "@/components/workout/WorkoutSummaryModal";
@@ -206,6 +207,8 @@ export function ActiveWorkout({
   const [totalPausedMs, setTotalPausedMs] = useState(() => loadPauseState(session.id).totalPausedMs);
   const isFirstRender = useRef(true);
   const prevLengthRef = useRef(exercises.length);
+  const railRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const initialIndex = firstUnfinishedExerciseIndex(session.exercises);
@@ -247,6 +250,57 @@ export function ActiveWorkout({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercises]);
+
+  // Fill in what we already know: the first set of an exercise starts from
+  // what was lifted last time instead of a blank weight.
+  const pastCompleted = (pastSessions ?? []).filter((s) => s.id !== session.id && !s.isActive);
+  const lastTime = (() => {
+    const ex = exercises[currentIndex];
+    return ex ? getLastCompletedSet(ex.exerciseId, pastCompleted) : null;
+  })();
+  useEffect(() => {
+    const ex = exercises[currentIndex];
+    const set = ex?.sets[currentSetIndex];
+    if (!ex || !set || set.completed || !lastTime) return;
+    if (ex.sets.some((s) => s.completed)) return;
+    const isCardio = ex.exerciseType === "cardio";
+    const blank = isCardio ? set.distance == null && set.duration == null : set.weight == null;
+    if (!blank) return;
+    setExercises((prev) =>
+      prev.map((e, i) =>
+        i !== currentIndex
+          ? e
+          : {
+              ...e,
+              // Every planned set that's still blank gets last time's numbers.
+              sets: e.sets.map((s) =>
+                s.completed
+                  ? s
+                  : isCardio
+                    ? {
+                        ...s,
+                        distance: s.distance ?? lastTime.distance,
+                        duration: s.duration ?? lastTime.duration,
+                      }
+                    : { ...s, weight: s.weight ?? lastTime.weight, reps: lastTime.reps ?? s.reps },
+              ),
+            },
+      ),
+    );
+    // lastTime is derived from these.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, currentSetIndex, pastSessions, exercises[currentIndex]?.exerciseId]);
+
+  // Keep the current exercise in view on the rail, with its neighbours
+  // peeking in from either side.
+  useEffect(() => {
+    const rail = railRef.current;
+    const node = rail?.querySelector<HTMLElement>(`[data-rail-index="${currentIndex}"]`);
+    if (!rail || !node) return;
+    const target = node.offsetLeft - (rail.clientWidth - node.offsetWidth) / 2;
+    rail.scrollTo({ left: Math.max(0, target), behavior: reduceMotion ? "auto" : "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, exercises.length]);
 
   const elapsedSeconds = Math.max(
     0,
@@ -452,8 +506,6 @@ export function ActiveWorkout({
     : -Infinity;
   const hasPR = Number.isFinite(currentPR);
 
-  const reduceMotion = useReducedMotion();
-
   return (
     <div className="mb-8">
       <Card
@@ -489,22 +541,6 @@ export function ActiveWorkout({
               : session.name}
         </p>
 
-        {showFinishWorkoutWarning && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-left">
-            <p className="text-xs text-ink">
-              {exercises.length - exercisesFinished} exercise{exercises.length - exercisesFinished === 1 ? "" : "s"}{" "}
-              unfinished. Finish anyway?
-            </p>
-            <div className="flex shrink-0 gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setShowFinishWorkoutWarning(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleFinishWorkout}>
-                Finish
-              </Button>
-            </div>
-          </div>
-        )}
       </Card>
 
       {exercises.length === 0 ? (
@@ -521,27 +557,44 @@ export function ActiveWorkout({
         />
       ) : (
         <>
-          <div className="mb-2 flex items-center justify-center gap-2 overflow-x-auto pb-1">
+          {/* One connected path from the first exercise to the last. It runs
+              edge to edge, so when the workout is longer than the screen the
+              next exercise is cut off at the edge, which says there's more. */}
+          <div ref={railRef} className="no-scrollbar -mx-4 mb-2 overflow-x-auto px-4 pb-1 md:-mx-6 md:px-6">
+            <div className="mx-auto flex w-max items-center">
             {exercises.map((ex, i) => (
-              <motion.button
-                key={ex.exerciseId}
-                type="button"
-                onClick={() => goToExercise(i)}
-                aria-label={`Jump to ${ex.name}`}
-                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-                transition={springDefault}
-                className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors",
-                  i === currentIndex
-                    ? "bg-brand-blue text-white"
-                    : ex.finished
-                      ? "bg-surface-card text-muted"
-                      : "border border-hairline text-ink",
+              <div key={ex.exerciseId} className="flex items-center">
+                {i > 0 && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "h-0.5 w-4 shrink-0 rounded-pill transition-colors",
+                      exercises[i - 1].finished ? "bg-brand-blue" : "bg-surface-strong",
+                    )}
+                  />
                 )}
-              >
-                {ex.finished ? <CheckCircle size={16} weight="fill" /> : i + 1}
-              </motion.button>
+                <motion.button
+                  type="button"
+                  data-rail-index={i}
+                  onClick={() => goToExercise(i)}
+                  aria-label={`Jump to ${ex.name}`}
+                  aria-current={i === currentIndex ? "step" : undefined}
+                  whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                  transition={springDefault}
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors",
+                    i === currentIndex
+                      ? "bg-brand-blue text-white"
+                      : ex.finished
+                        ? "bg-brand-blue/15 text-brand-blue"
+                        : "bg-canvas text-ink ring-2 ring-inset ring-surface-strong",
+                  )}
+                >
+                  {ex.finished && i !== currentIndex ? <Check size={16} weight="bold" /> : i + 1}
+                </motion.button>
+              </div>
             ))}
+            <span aria-hidden className="h-0.5 w-4 shrink-0 rounded-pill bg-surface-strong" />
             <motion.button
               type="button"
               onClick={() => setShowAddExercise(true)}
@@ -552,6 +605,7 @@ export function ActiveWorkout({
             >
               <Plus size={16} />
             </motion.button>
+            </div>
           </div>
           <p className="mb-4 text-center text-xs text-muted">Tap any exercise to jump to it</p>
 
@@ -583,6 +637,20 @@ export function ActiveWorkout({
                       </span>
                     )}
                   </div>
+
+                  {lastTime && !current.sets.some((s) => s.completed) && (
+                    <p className="tabular -mt-1.5 mb-3 text-xs text-muted">
+                      Filled in from last time:{" "}
+                      {isCardio
+                        ? [
+                            lastTime.distance != null && `${lastTime.distance} mi`,
+                            lastTime.duration != null && `${lastTime.duration} min`,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")
+                        : `${lastTime.weight != null ? formatWeight(lastTime.weight, weightUnit) : "bodyweight"} × ${lastTime.reps ?? 0}`}
+                    </p>
+                  )}
 
                   {isCardio ? (
                     <div className="grid grid-cols-2 gap-4">
@@ -713,6 +781,50 @@ export function ActiveWorkout({
             </button>
           </div>
           <ExercisePicker exercises={availableToAdd} onSelect={addExerciseToWorkout} allowCreate autoFocus />
+        </Modal>
+      )}
+
+      {showFinishWorkoutWarning && (
+        <Modal
+          onClose={() => setShowFinishWorkoutWarning(false)}
+          ariaLabel="Finish workout"
+          className="max-w-sm p-6"
+        >
+          <h3 className="mb-2 text-lg font-semibold text-ink">
+            Finish with {exercises.length - exercisesFinished} exercise
+            {exercises.length - exercisesFinished === 1 ? "" : "s"} left?
+          </h3>
+          <p className="mb-3 text-sm text-muted">These haven't been marked done. Sets you've logged are kept either way.</p>
+          <ul className="mb-5 overflow-hidden rounded-md bg-surface-soft">
+            {exercises.map(
+              (ex, i) =>
+                !ex.finished && (
+                  <li key={ex.exerciseId} className="border-t border-hairline first:border-t-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFinishWorkoutWarning(false);
+                        goToExercise(i);
+                      }}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-ink transition-colors active:bg-surface-strong"
+                    >
+                      <span className="min-w-0 truncate">{ex.name}</span>
+                      <span className="shrink-0 text-xs text-muted">
+                        {ex.sets.filter((s) => s.completed).length} of {ex.sets.length} sets
+                      </span>
+                    </button>
+                  </li>
+                ),
+            )}
+          </ul>
+          <div className="flex flex-col gap-2">
+            <Button className="w-full" onClick={handleFinishWorkout}>
+              Finish workout
+            </Button>
+            <Button variant="secondary" className="w-full" onClick={() => setShowFinishWorkoutWarning(false)}>
+              Keep going
+            </Button>
+          </div>
         </Modal>
       )}
 

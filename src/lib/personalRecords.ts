@@ -1,4 +1,4 @@
-import type { WorkoutSession } from "@/lib/types";
+import type { WorkoutSession, WorkoutSet } from "@/lib/types";
 
 export interface ExercisePR {
   exerciseId: string;
@@ -45,4 +45,20 @@ export function getExercisePR(exerciseId: string, sessions: WorkoutSession[]): n
     }
   }
   return max;
+}
+
+// The last completed set of an exercise in the most recent session that
+// logged one, used to fill in the first set next time.
+export function getLastCompletedSet(exerciseId: string, sessions: WorkoutSession[]): WorkoutSet | null {
+  let best: { at: number; set: WorkoutSet } | null = null;
+  for (const session of sessions) {
+    const at = new Date(session.startTime).getTime();
+    if (best && at <= best.at) continue;
+    for (const exercise of session.exercises) {
+      if (exercise.exerciseId !== exerciseId) continue;
+      const done = exercise.sets.filter((set) => set.completed);
+      if (done.length > 0) best = { at, set: done[done.length - 1] };
+    }
+  }
+  return best?.set ?? null;
 }

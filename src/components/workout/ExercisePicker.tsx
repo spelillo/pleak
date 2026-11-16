@@ -3,6 +3,7 @@ import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/Input";
 import { CreateExerciseModal } from "@/components/workout/CreateExerciseModal";
 import type { Exercise } from "@/lib/types";
+import type { MovementType } from "@/lib/workoutGeneration";
 
 interface ExercisePickerProps {
   exercises: Exercise[];
@@ -14,6 +15,8 @@ interface ExercisePickerProps {
   /** Shown before anything is typed, e.g. alternatives for a swap. */
   suggestions?: Exercise[];
   suggestionsLabel?: string;
+  /** What a new exercise most likely is here, e.g. Push on a push day. */
+  createDefaults?: { movementType?: MovementType; muscleGroups?: string[] };
 }
 
 function matchesQuery(exercise: Exercise, query: string) {
@@ -29,6 +32,7 @@ export function ExercisePicker({
   allowCreate,
   suggestions,
   suggestionsLabel,
+  createDefaults,
 }: ExercisePickerProps) {
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -96,6 +100,8 @@ export function ExercisePicker({
       {showCreate && (
         <CreateExerciseModal
           initialName={normalizedQuery && matches.length === 0 ? query.trim() : ""}
+          initialMuscleGroups={createDefaults?.muscleGroups}
+          initialMovementType={createDefaults?.movementType}
           onCreated={(ex) => {
             setShowCreate(false);
             setQuery("");

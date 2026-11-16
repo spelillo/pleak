@@ -7,11 +7,18 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { springDefault } from "@/lib/motion";
+import { StepTrack } from "@/components/ui/StepTrack";
 import { ExercisePicker } from "@/components/workout/ExercisePicker";
 import { useExercises } from "@/lib/queries/exercises";
 import { useSaveWeeklyPlanDay, useDeleteWeeklyPlanDay } from "@/lib/queries/weeklyPlans";
 import { useStartWorkoutSession, useWorkoutSessions } from "@/lib/queries/workoutSessions";
-import { generateDraftExercises, toWorkoutExercise, WORKOUT_TYPES, type WorkoutTypeOption } from "@/lib/workoutGeneration";
+import {
+  generateDraftExercises,
+  toWorkoutExercise,
+  WORKOUT_TYPES,
+  type MovementType,
+  type WorkoutTypeOption,
+} from "@/lib/workoutGeneration";
 import type { Exercise, WeeklyPlanDay, WorkoutExercise } from "@/lib/types";
 
 type Step = "type" | "choice" | "curate";
@@ -128,6 +135,16 @@ export function WeeklyPlanDayModal({
     return availableToAdd.filter((ex) => ex.muscleGroups[0] === group && ex.category === current.category);
   }
 
+  // A new exercise made while swapping most likely works the same muscles.
+  function swapCreateDefaults(index: number) {
+    const current = library?.find((ex) => ex.id === draft[index]?.exerciseId);
+    if (!current) return undefined;
+    return {
+      muscleGroups: current.muscleGroups,
+      movementType: (current.movementType ?? undefined) as MovementType | undefined,
+    };
+  }
+
   function handleSave() {
     saveDay.mutate(buildDay(title || "Workout", draft),
       { onError: () => onError("Couldn't save your plan — check your connection.") },
@@ -199,6 +216,14 @@ export function WeeklyPlanDayModal({
       </div>
 
       <div className="overflow-y-auto p-5">
+        {/* Planning a new day is one path: type, how to plan it, exercises. */}
+        {!existing && (
+          <StepTrack
+            steps={["Type", "Plan", "Exercises"]}
+            current={{ type: 0, choice: 1, curate: 2 }[step]}
+            className="mb-5"
+          />
+        )}
         {step === "type" && (
           <div className="flex flex-col gap-3">
             <p className="mb-1 text-sm text-muted">What kind of workout?</p>
@@ -316,6 +341,7 @@ export function WeeklyPlanDayModal({
                           onSelect={(ex) => handleSwapExercise(index, ex)}
                           placeholder={`Replace ${exercise.name}…`}
                           allowCreate
+                          createDefaults={swapCreateDefaults(index)}
                         />
                       </div>
                     )}
@@ -347,6 +373,7 @@ export function WeeklyPlanDayModal({
                   placeholder="Search exercises to add…"
                   autoFocus
                   allowCreate
+                  createDefaults={{ movementType: selectedType?.movementType }}
                 />
               </div>
             )}

@@ -23,6 +23,7 @@ export function ExerciseLibrary() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const categoryOptions = useMemo(() => {
     const set = new Set((exercises ?? []).map((ex) => ex.category));
@@ -35,6 +36,10 @@ export function ExerciseLibrary() {
       (ex) => (category === "all" || ex.category === category) && matchesQuery(ex, normalizedQuery),
     );
   }, [exercises, query, category]);
+
+  // Choice overload: a short list until the user searches or asks for more.
+  const BROWSE_LIMIT = 12;
+  const visible = query.trim() || showAll ? filtered : filtered.slice(0, BROWSE_LIMIT);
 
   return (
     <div>
@@ -97,7 +102,7 @@ export function ExerciseLibrary() {
             />
           ) : (
             <ul className="divide-y divide-hairline overflow-hidden rounded-lg bg-canvas shadow-[var(--shadow-sm)]">
-              {filtered.map((exercise) => (
+              {visible.map((exercise) => (
                 <li key={exercise.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink">{exercise.name}</p>
@@ -112,6 +117,17 @@ export function ExerciseLibrary() {
                   </div>
                 </li>
               ))}
+              {visible.length < filtered.length && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setShowAll(true)}
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-brand-blue transition-colors active:bg-surface-strong"
+                  >
+                    Show all {filtered.length} exercises
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </>
